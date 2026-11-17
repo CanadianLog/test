@@ -49,6 +49,9 @@
   .handle { cursor: grab; color: var(--muted); text-align: center; user-select: none; font-size: 18px; }
   .thumb { width: 120px; aspect-ratio: 16/9; object-fit: cover; border-radius: 6px; background: #000; display: block; }
   .portrait .thumb { aspect-ratio: 9/16; width: 68px; margin: 0 26px; }
+  .ytthumb { position: relative; display: block; }
+  .ytthumb::after { content: '▶'; position: absolute; inset: 0; margin: auto; width: 30px; height: 21px; border-radius: 6px;
+                    background: #e00; color: #fff; font-size: 11px; display: flex; align-items: center; justify-content: center; }
   .ad .fields { display: grid; grid-template-columns: 2fr 90px 1fr 1fr; gap: 8px; }
   .ad .actions { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
   .tag { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
@@ -126,6 +129,12 @@
         </div>
         <input type="file" id="fileInput" accept="image/*,video/*" multiple hidden>
         <progress id="prog" value="0" max="100" hidden></progress>
+        <form id="ytForm" class="row" style="margin-top:16px">
+          <div style="flex:1 1 260px"><label>…or add a YouTube video (paste the link)</label>
+            <input name="url" placeholder="https://www.youtube.com/watch?v=…  or a Shorts link" required></div>
+          <div style="flex:0 0 auto"><button class="primary">Add YouTube video</button></div>
+        </form>
+        <small class="muted">YouTube videos need internet to play, and the video's owner must allow embedding.</small>
       </div>
 
       <div class="card">
@@ -332,9 +341,13 @@ function renderAds() {
 
   ads.forEach(ad => {
     const src = '/media/' + ad.file;
-    const thumb = ad.type === 'video'
+    const thumb = ad.type === 'youtube'
+      ? el('a', { href: `https://www.youtube.com/watch?v=${ad.ytId}`, target: '_blank', rel: 'noopener', title: 'Open on YouTube', class: 'ytthumb' },
+          el('img', { class: 'thumb', src: `https://i.ytimg.com/vi/${ad.ytId}/hqdefault.jpg`, alt: '', loading: 'lazy' }))
+      : ad.type === 'video'
       ? el('video', { class: 'thumb', src: src + '#t=1', muted: true, preload: 'metadata' })
       : el('img', { class: 'thumb', src, alt: '', loading: 'lazy' });
+    const kind = { youtube: 'YouTube', video: 'video', image: 'picture' }[ad.type];
     const save = patch => api(`/api/ads/${ad.id}${asParam()}`, { method: 'PATCH', body: patch })
       .then(u => { Object.assign(ad, u); toast('Saved'); renderSummary(); }).catch(fail);
 
@@ -343,11 +356,14 @@ function renderAds() {
         onmousedown: () => (row.draggable = true), ontouchstart: () => (row.draggable = true) }, '☰'),
       thumb,
       el('div', { class: 'fields' },
-        el('div', {}, el('label', {}, ad.type === 'video' ? 'Name · video' : 'Name · picture'),
+        el('div', {}, el('label', {}, 'Name · ' + kind),
           el('input', { value: ad.name, onchange: e => save({ name: e.target.value }) })),
-        el('div', {}, el('label', {}, ad.type === 'video' ? 'Plays full' : 'Seconds'),
+        el('div', {}, el('label', {}, ad.type === 'video' ? 'Plays full' : ad.type === 'youtube' ? 'Max seconds' : 'Seconds'),
           ad.type === 'video'
             ? el('input', { value: '—', disabled: true, title: 'Videos play to the end' })
+            : ad.type === 'youtube'
+            ? el('input', { type: 'number', min: 0, max: 36000, value: ad.duration || '', placeholder: 'Full',
+                title: 'Leave blank to play the whole video', onchange: e => save({ duration: +e.target.value || 0 }) })
             : el('input', { type: 'number', min: 1, max: 3600, value: ad.duration, onchange: e => save({ duration: +e.target.value }) })),
         el('div', {}, el('label', {}, 'Start date (optional)'),
           el('input', { type: 'date', value: ad.startDate || '', onchange: e => save({ startDate: e.target.value }) })),
@@ -405,6 +421,14 @@ fileInput.onchange = () => { upload(fileInput.files); fileInput.value = ''; };
 ['dragenter', 'dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
 ['dragleave', 'drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('over'); }));
 drop.addEventListener('drop', e => upload(e.dataTransfer.files));
+
+$('#ytForm').onsubmit = e => {
+  e.preventDefault();
+  const btn = e.target.querySelector('button'); btn.disabled = true;
+  api('/api/ads/youtube' + asParam(), { method: 'POST', body: { url: e.target.url.value } })
+    .then(ad => { e.target.reset(); toast(`Added “${ad.name}”`); loadAds(); })
+    .catch(fail).finally(() => (btn.disabled = false));
+};
 
 function upload(files) {
   if (!files.length) return;

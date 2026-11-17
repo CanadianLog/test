@@ -63,6 +63,16 @@ Mount the TV on its side, then in the dashboard go to **Screen → Screen orient
 
 (Or rotate the display in ChromeOS instead: Settings → *Device* → *Displays* → *Orientation*, and leave the dashboard on Landscape. Use one method, not both.)
 
+## YouTube ads
+
+In **My ads**, paste a YouTube link (normal video, `youtu.be` short link, or Shorts) into *Add YouTube video*. It goes in the playlist like any other ad. It plays the whole video, or set **Max seconds** to cut it short.
+
+- YouTube ads need internet. If the connection drops, the screen skips them and keeps playing uploaded pictures and videos.
+- The video's owner must allow embedding. Most videos do. If one doesn't, or it's private or deleted, the screen skips it.
+- Sound follows the *Mute video sound* setting.
+- YouTube may play its own ads before some videos, which YouTube and the video's owner control. To avoid that, upload the video file instead (best for the customer's own videos).
+- For vertical screens, YouTube **Shorts** fill the screen best.
+
 ## Tips
 
 - Pictures: use 1920×1080 landscape JPG or PNG. Videos: use MP4 (H.264). Videos play all the way through and are muted unless you turn off *Mute video sound* in Screen settings.

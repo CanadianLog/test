@@ -207,6 +207,53 @@ app.post('/api/ads', auth, upload.array('files', 20), (req, res) => {
   res.json(added);
 });
 
+// --- YouTube ads: customer pastes a link, we store the video id
+function youtubeId(input) {
+  const s = String(input || '').trim();
+  if (/^[\w-]{11}$/.test(s)) return s;
+  let u;
+  try { u = new URL(/^https?:\/\//i.test(s) ? s : 'https://' + s); } catch { return null; }
+  const host = u.hostname.replace(/^(www|m|music)\./, '');
+  let id = null;
+  if (host === 'youtu.be') id = u.pathname.split('/')[1];
+  else if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
+    id = u.searchParams.get('v');
+    const m = u.pathname.match(/^\/(?:shorts|embed|live|v)\/([\w-]{11})/);
+    if (!id && m) id = m[1];
+  }
+  return id && /^[\w-]{11}$/.test(id) ? id : null;
+}
+
+async function youtubeTitle(id) {
+  try {
+    const r = await fetch(`https://www.youtube.com/oembed?format=json&url=${encodeURIComponent('https://www.youtube.com/watch?v=' + id)}`,
+      { signal: AbortSignal.timeout(5000) });
+    if (r.ok) return (await r.json()).title;
+  } catch {}
+  return null;
+}
+
+app.post('/api/ads/youtube', auth, async (req, res) => {
+  const u = target(req);
+  if (!u) return res.status(404).json({ error: 'Account not found' });
+  const id = youtubeId(req.body?.url);
+  if (!id) return res.status(400).json({ error: 'That doesn\'t look like a YouTube link' });
+  const title = await youtubeTitle(id);
+  const order = adsFor(u.id).reduce((m, a) => Math.max(m, a.order), 0) + 1;
+  const ad = {
+    id: newId(), ownerId: u.id, type: 'youtube', ytId: id, file: null,
+    name: (title || 'YouTube video').slice(0, 80),
+    duration: 0,            // 0 = play the whole video
+    enabled: true, startDate: null, endDate: null, order,
+    createdAt: new Date().toISOString(),
+  };
+  db.ads.push(ad);
+  bump(u); save();
+  res.json(ad);
+});
+
+const removeMedia = ad => { if (ad.file) fs.rm(path.join(MEDIA_DIR, ad.file), { force: true }, () => {}); };
+
 function ownAd(req, res) {
   const u = target(req);
   const ad = u && db.ads.find(a => a.id === req.params.id && a.ownerId === u.id);
@@ -218,7 +265,11 @@ app.patch('/api/ads/:id', auth, (req, res) => {
   const r = ownAd(req, res); if (!r) return;
   const b = req.body || {};
   if (typeof b.name === 'string') r.ad.name = b.name.slice(0, 80);
-  if (b.duration !== undefined) r.ad.duration = Math.min(3600, Math.max(1, Number(b.duration) || 10));
+  if (b.duration !== undefined) {
+    r.ad.duration = r.ad.type === 'youtube'
+      ? Math.min(36000, Math.max(0, Number(b.duration) || 0))        // 0 = whole video
+      : Math.min(3600, Math.max(1, Number(b.duration) || 10));
+  }
   if (typeof b.enabled === 'boolean') r.ad.enabled = b.enabled;
   for (const k of ['startDate', 'endDate']) {
     if (b[k] !== undefined) r.ad[k] = /^\d{4}-\d{2}-\d{2}$/.test(b[k]) ? b[k] : null;
@@ -230,7 +281,7 @@ app.patch('/api/ads/:id', auth, (req, res) => {
 app.delete('/api/ads/:id', auth, (req, res) => {
   const r = ownAd(req, res); if (!r) return;
   db.ads = db.ads.filter(a => a !== r.ad);
-  fs.rm(path.join(MEDIA_DIR, r.ad.file), { force: true }, () => {});
+  removeMedia(r.ad);
   bump(r.u); save();
   res.json({ ok: true });
 });
@@ -307,7 +358,7 @@ app.delete('/api/users/:id', auth, adminOnly, (req, res) => {
   const u = db.users.find(x => x.id === req.params.id);
   if (!u) return res.status(404).json({ error: 'Not found' });
   if (u.role === 'admin') return res.status(400).json({ error: 'Cannot delete an admin' });
-  for (const ad of adsFor(u.id)) fs.rm(path.join(MEDIA_DIR, ad.file), { force: true }, () => {});
+  for (const ad of adsFor(u.id)) removeMedia(ad);
   db.ads = db.ads.filter(a => a.ownerId !== u.id);
   db.users = db.users.filter(x => x !== u);
   for (const [t, s] of Object.entries(db.sessions)) if (s.userId === u.id) delete db.sessions[t];
@@ -327,7 +378,9 @@ app.get('/api/screen/:key/playlist', (req, res) => {
   const d = req.query.date && /^\d{4}-\d{2}-\d{2}$/.test(req.query.date) ? req.query.date : today();
   const items = adsFor(u.id)
     .filter(a => a.enabled && (!a.startDate || a.startDate <= d) && (!a.endDate || a.endDate >= d))
-    .map(a => ({ id: a.id, type: a.type, url: '/media/' + a.file, duration: a.duration }));
+    .map(a => a.type === 'youtube'
+      ? { id: a.id, type: 'youtube', ytId: a.ytId, duration: a.duration }
+      : { id: a.id, type: a.type, url: '/media/' + a.file, duration: a.duration });
   res.set('Cache-Control', 'no-store');
   res.json({ version: u.version, reloadToken: u.reloadToken || null, settings: u.settings, items });
 });
