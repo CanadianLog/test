@@ -57,6 +57,12 @@ A personal Chromebook always asks for a password after a full power-off. To boot
 
 The Chromebook then boots directly into the ad player and recovers by itself after a power cut.
 
+## Vertical (portrait) screens
+
+Mount the TV on its side, then in the dashboard go to **Screen → Screen orientation** and choose **Portrait**. The player rotates itself, so you don't need to change any Chromebook settings. If the ads come out upside down, choose the other Portrait option. Make vertical ads at **1080×1920**.
+
+(Or rotate the display in ChromeOS instead: Settings → *Device* → *Displays* → *Orientation*, and leave the dashboard on Landscape. Use one method, not both.)
+
 ## Tips
 
 - Pictures: use 1920×1080 landscape JPG or PNG. Videos: use MP4 (H.264). Videos play all the way through and are muted unless you turn off *Mute video sound* in Screen settings.

@@ -51,7 +51,7 @@ function createUser({ username, password, role = 'customer', businessName = '' }
     salt,
     hash,
     screenKey: newId(12),
-    settings: { transition: 'fade', defaultDuration: 10, muteVideos: true, fit: 'contain', background: '#000000' },
+    settings: { transition: 'fade', defaultDuration: 10, muteVideos: true, fit: 'contain', background: '#000000', rotation: 0 },
     version: 1,
     lastSeen: null,
     createdAt: new Date().toISOString(),
@@ -254,6 +254,7 @@ app.patch('/api/settings', auth, (req, res) => {
   const s = u.settings;
   if (['fade', 'slide', 'none'].includes(b.transition)) s.transition = b.transition;
   if (['contain', 'cover'].includes(b.fit)) s.fit = b.fit;
+  if ([0, 90, 180, 270].includes(Number(b.rotation))) s.rotation = Number(b.rotation);
   if (b.defaultDuration !== undefined) s.defaultDuration = Math.min(3600, Math.max(1, Number(b.defaultDuration) || 10));
   if (typeof b.muteVideos === 'boolean') s.muteVideos = b.muteVideos;
   if (typeof b.background === 'string' && /^#[0-9a-f]{6}$/i.test(b.background)) s.background = b.background;
