@@ -5,7 +5,7 @@ services:
     name: ad-screen
     runtime: node
     plan: starter            # free plan has no permanent disk, so ads would be lost
-    branch: claude/confident-allen-8s9kqy
+    branch: master
     buildCommand: npm ci
     startCommand: npm start
     healthCheckPath: /admin
