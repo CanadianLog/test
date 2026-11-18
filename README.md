@@ -74,6 +74,40 @@ In **My ads**, paste a YouTube link (normal video, `youtu.be` short link, or Sho
 - YouTube may play its own ads before some videos, which YouTube and the video's owner control. To avoid that, upload the video file instead (best for the customer's own videos).
 - For vertical screens, YouTube **Shorts** fill the screen best.
 
+## Instagram
+
+There are two ways to get Instagram posts onto the screen.
+
+**1. Save and upload (works now, no setup).** The customer saves their own Reel from the Instagram app (⋯ → *Download* / *Save to device*), then uploads it from their phone in the dashboard. The dashboard has these steps under *My ads → Instagram*.
+
+**2. Connect Instagram (one-time setup by you).** The customer clicks **Connect Instagram**, then picks posts to put on the screen, or turns on **Automatically add new Reels**, which checks every 30 minutes. The server copies each post, so it also plays when the internet is down. This uses Instagram's official API, so:
+
+- The customer's Instagram must be a **Business or Creator** account. They can switch for free: Instagram app → Settings → *Account type and tools*.
+- You need a free **Meta developer app**. Set it up once for all your customers:
+
+1. Go to **developers.facebook.com** → *My Apps* → **Create app**. Choose the use case for managing content on Instagram (Meta renames these menus from time to time).
+2. In the app, open **Instagram → API setup with Instagram login**. Copy the **Instagram app ID** and **Instagram app secret**. These are *not* the Facebook app ID.
+3. Under **Set up Instagram business login → Business login settings**, add this **OAuth redirect URI**:
+   `https://YOUR-SITE/auth/instagram/callback`
+   (for example `https://ad-screen-9s7k.onrender.com/auth/instagram/callback`). The admin dashboard shows the exact address under *My ads → Instagram* until it's set up.
+4. In Render → your service → **Environment**, add:
+   - `IG_APP_ID` = the Instagram app ID
+   - `IG_APP_SECRET` = the Instagram app secret
+   - `PUBLIC_URL` = `https://YOUR-SITE` (optional, but recommended if you add your own domain)
+
+   Save. Render restarts the app.
+5. **Let your customer connect.** While the Meta app is in *Development* mode, only accounts you invite can connect:
+   - Meta app → *App roles → Roles* → **Add Instagram testers** → enter the customer's Instagram username.
+   - The customer accepts the invite in Instagram: Settings → *Website permissions → Apps and websites → Tester invites*, or at instagram.com/accounts/manage_access.
+
+   That's fine for a handful of customers. To let anyone connect without an invite, submit the app for Meta's *App Review* (permission `instagram_business_basic`).
+
+Notes:
+- Access is renewed automatically. If Instagram ever cancels it (password change, access removed), the dashboard shows **Reconnect Instagram**.
+- Auto-add only picks up Reels posted *after* it's switched on, so it won't flood the screen with old posts.
+- Some Reels that use licensed music can't be copied. Instagram doesn't provide their file.
+- iPhone **HEIC** photos are rejected with a message, because Chrome can't display them. Upload a JPG or a screenshot instead.
+
 ## Tips
 
 - Pictures: use 1920×1080 landscape JPG or PNG. Videos: use MP4 (H.264). Videos play all the way through and are muted unless you turn off *Mute video sound* in Screen settings.

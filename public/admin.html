@@ -49,6 +49,16 @@
   .handle { cursor: grab; color: var(--muted); text-align: center; user-select: none; font-size: 18px; }
   .thumb { width: 120px; aspect-ratio: 16/9; object-fit: cover; border-radius: 6px; background: #000; display: block; }
   .portrait .thumb { aspect-ratio: 9/16; width: 68px; margin: 0 26px; }
+  .iglogo { width: 22px; height: 22px; border-radius: 6px; display: inline-block;
+            background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fd5949 45%, #d6249f 60%, #285AEB 90%); }
+  .iggrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+  .igitem { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
+  .igitem img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: #000; }
+  .igitem .meta { padding: 8px; display: flex; flex-direction: column; gap: 6px; flex: 1; font-size: 12px; }
+  .igitem .cap { color: var(--muted); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; flex: 1; }
+  .igitem button { padding: 5px 8px; font-size: 13px; }
+  .problem { color: var(--danger); margin: 0 0 10px; }
+  details summary { cursor: pointer; color: var(--accent); font-weight: 600; }
   .ytthumb { position: relative; display: block; }
   .ytthumb::after { content: '▶'; position: absolute; inset: 0; margin: auto; width: 30px; height: 21px; border-radius: 6px;
                     background: #e00; color: #fff; font-size: 11px; display: flex; align-items: center; justify-content: center; }
@@ -56,10 +66,12 @@
   .ad .actions { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
   .tag { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
   .switch { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+  .ad .fields > div { min-width: 0; }
+  .ad .fields input { min-width: 0; }
   @media (max-width: 760px) {
-    .ad { grid-template-columns: 20px 90px 1fr; }
+    .ad { grid-template-columns: 20px 90px minmax(0, 1fr); }
     .thumb { width: 90px; }
-    .ad .fields { grid-template-columns: 1fr 1fr; grid-column: 2 / 4; }
+    .ad .fields { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-column: 2 / 4; }
     .ad .actions { grid-column: 2 / 4; flex-direction: row; flex-wrap: wrap; }
   }
   .linkbox { display: flex; gap: 8px; }
@@ -124,17 +136,34 @@
       <div class="card">
         <h2>Add ads</h2>
         <div id="drop">
-          <b>Drop pictures or videos here</b> or click to choose files<br>
+          <span id="dropText"><b>Drop pictures or videos here</b> or click to choose files</span><br>
           <small>JPG, PNG, GIF, WebP, MP4, WebM · Best size: <span id="bestSize">1920×1080 (landscape)</span></small>
         </div>
         <input type="file" id="fileInput" accept="image/*,video/*" multiple hidden>
-        <progress id="prog" value="0" max="100" hidden></progress>
+        <div id="progWrap" hidden><progress id="prog" value="0" max="100"></progress><small class="muted" id="progText"></small></div>
         <form id="ytForm" class="row" style="margin-top:16px">
           <div style="flex:1 1 260px"><label>…or add a YouTube video (paste the link)</label>
             <input name="url" placeholder="https://www.youtube.com/watch?v=…  or a Shorts link" required></div>
           <div style="flex:0 0 auto"><button class="primary">Add YouTube video</button></div>
         </form>
         <small class="muted">YouTube videos need internet to play, and the video's owner must allow embedding.</small>
+      </div>
+
+      <div class="card" id="igCard">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+          <h2 style="margin:0;display:flex;align-items:center;gap:8px"><span class="iglogo"></span> Instagram</h2>
+          <div id="igActions" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"></div>
+        </div>
+        <div id="igBody" style="margin-top:12px"></div>
+        <details style="margin-top:14px">
+          <summary>Put a Reel on the screen from your phone (no connection needed)</summary>
+          <ol class="steps" style="margin-top:10px">
+            <li>In the Instagram app, open your Reel or video post.</li>
+            <li>Tap <b>⋯</b> (or the share ✈ button) → <b>Download</b> / <b>Save to device</b>. It goes to your photos.</li>
+            <li>Open this dashboard on your phone, tap <b>Choose pictures or videos</b> above, and pick the video.</li>
+          </ol>
+          <p class="muted" style="font-size:13px;margin:0">You can only download your own Reels. Videos with licensed music may download without sound.</p>
+        </details>
       </div>
 
       <div class="card">
@@ -302,6 +331,7 @@ async function start() {
   $('#who').textContent = me.username;
   $$('[data-admin]').forEach(x => (x.hidden = me.role !== 'admin'));
   await loadAds();
+  loadInstagram();
   if (me.role === 'admin') loadUsers();
 }
 
@@ -434,17 +464,24 @@ function upload(files) {
   if (!files.length) return;
   const fd = new FormData();
   [...files].forEach(f => fd.append('files', f));
-  const prog = $('#prog'); prog.hidden = false; prog.value = 0;
+  const prog = $('#prog'), wrap = $('#progWrap'), label = $('#progText');
+  const n = files.length, what = `${n} file${n === 1 ? '' : 's'}`;
+  wrap.hidden = false; prog.value = 0; label.textContent = `Uploading ${what}…`;
   const xhr = new XMLHttpRequest();
   xhr.open('POST', '/api/ads' + asParam());
-  xhr.upload.onprogress = e => e.lengthComputable && (prog.value = e.loaded / e.total * 100);
+  xhr.upload.onprogress = e => {
+    if (!e.lengthComputable) return;
+    const pct = Math.round(e.loaded / e.total * 100);
+    prog.value = pct;
+    label.textContent = pct < 100 ? `Uploading ${what}… ${pct}% (keep this page open)` : 'Finishing…';
+  };
   xhr.onload = () => {
-    prog.hidden = true;
+    wrap.hidden = true;
     let d = {}; try { d = JSON.parse(xhr.responseText); } catch (e) {}
     if (xhr.status !== 200) return toast(d.error || 'Upload failed');
     toast(`Added ${d.length} ad${d.length === 1 ? '' : 's'}`); loadAds();
   };
-  xhr.onerror = () => { prog.hidden = true; toast('Upload failed — check your connection'); };
+  xhr.onerror = () => { wrap.hidden = true; toast('Upload failed — check your connection'); };
   xhr.send(fd);
 }
 
@@ -511,16 +548,108 @@ function manage(id) {
   acting = id;
   $$('nav button')[0].click();
   loadAds();
+  loadInstagram();
 }
-$('#stopActing').onclick = () => { acting = null; loadAds(); };
+$('#stopActing').onclick = () => { acting = null; loadAds(); loadInstagram(); };
 $('#newUser').onsubmit = e => {
   e.preventDefault();
   const f = Object.fromEntries(new FormData(e.target));
   api('/api/users', { method: 'POST', body: f }).then(u => { e.target.reset(); toast(`Created ${u.username}`); loadUsers(); }).catch(fail);
 };
 
+// ---------------- phones: tap instead of drag
+if (matchMedia('(pointer: coarse)').matches) {
+  $('#dropText').innerHTML = '<b>Choose pictures or videos</b><br>from your phone\'s photos';
+}
+
+// ---------------- Instagram
+let igState = null;
+async function loadInstagram() {
+  const card = $('#igCard'), actions = $('#igActions'), body = $('#igBody');
+  actions.innerHTML = ''; body.innerHTML = '';
+  try { igState = await api('/api/instagram' + asParam()); } catch (e) { return; }
+  const ig = igState;
+
+  if (!ig.configured) {
+    if (me.role === 'admin') {
+      body.append(el('p', { class: 'muted', style: 'margin:0' },
+        'Instagram connection is not switched on yet. It needs a free Meta developer app: see "Instagram" in the README. ',
+        'Redirect URL to give Meta: ', el('code', {}, ig.redirectUri)));
+    } else {
+      body.append(el('p', { class: 'muted', style: 'margin:0' }, 'To show an Instagram Reel, save it to your phone and upload it (steps below).'));
+    }
+    return;
+  }
+
+  const connectBtn = label => el('button', { class: 'primary', onclick: () => (location.href = '/auth/instagram/start' + asParam()) }, label);
+  if (!ig.connected) {
+    actions.append(connectBtn('Connect Instagram'));
+    body.append(el('p', { class: 'muted', style: 'margin:0' },
+      'Connect your Instagram to pick posts for the screen, or have new Reels added automatically. ',
+      'Your account must be a Business or Creator account (Instagram app → Settings → Account type).'));
+    return;
+  }
+
+  actions.append(
+    el('span', { class: 'muted' }, 'Connected as ', el('b', {}, '@' + ig.username)),
+    el('button', { onclick: () => {
+      if (!confirm('Disconnect Instagram? Posts already on the screen stay there.')) return;
+      api('/api/instagram/disconnect' + asParam(), { method: 'POST' }).then(() => { toast('Instagram disconnected'); loadInstagram(); }).catch(fail);
+    } }, 'Disconnect'),
+  );
+  if (ig.problem) {
+    body.append(el('p', { class: 'problem' }, ig.problem + ' '), connectBtn('Reconnect Instagram'));
+    return;
+  }
+  body.append(
+    el('label', { class: 'switch', style: 'margin-bottom:12px;color:var(--text)' },
+      el('input', { type: 'checkbox', checked: ig.autoAdd, onchange: e =>
+        api('/api/instagram' + asParam(), { method: 'PATCH', body: { autoAdd: e.target.checked } })
+          .then(r => toast(r.autoAdd ? 'New Reels will be added to the screen automatically' : 'Auto-add turned off')).catch(fail) }),
+      'Automatically add new Reels to the screen (checked every 30 minutes)'),
+    el('div', { id: 'igGrid' }, el('button', { onclick: loadIgMedia }, 'Show my Instagram posts')),
+  );
+}
+
+async function loadIgMedia() {
+  const grid = $('#igGrid');
+  grid.innerHTML = '<p class="muted">Loading your posts…</p>';
+  let media;
+  try { media = await api('/api/instagram/media' + asParam()); }
+  catch (e) { grid.innerHTML = ''; grid.append(el('p', { class: 'problem' }, e.message)); return loadInstagram(); }
+  grid.innerHTML = '';
+  if (!media.length) { grid.append(el('p', { class: 'muted' }, 'No photos or videos found on this account.')); return; }
+  grid.className = 'iggrid';
+  media.forEach(m => {
+    const btn = el('button', { class: m.added ? '' : 'primary', disabled: m.added }, m.added ? 'On screen ✓' : 'Add to screen');
+    btn.onclick = () => {
+      btn.disabled = true; btn.textContent = m.type === 'video' ? 'Copying video…' : 'Adding…';
+      api('/api/instagram/add' + asParam(), { method: 'POST', body: { id: m.id } })
+        .then(() => { btn.textContent = 'On screen ✓'; btn.className = ''; toast('Added to your screen'); loadAds(); })
+        .catch(e => { btn.disabled = false; btn.textContent = 'Add to screen'; fail(e); });
+    };
+    grid.append(el('div', { class: 'igitem' },
+      el('a', { href: m.permalink, target: '_blank', rel: 'noopener' }, el('img', { src: m.thumb, alt: '', loading: 'lazy' })),
+      el('div', { class: 'meta' },
+        el('span', { class: 'tag' }, m.reel ? 'Reel' : m.type === 'video' ? 'Video' : 'Photo'),
+        el('span', { class: 'cap' }, m.caption || ''),
+        btn)));
+  });
+}
+
 // ---------------- boot
-api('/api/me').then(u => { me = u; start(); }).catch(showLogin);
+const params = new URLSearchParams(location.search);
+api('/api/me').then(u => {
+  me = u;
+  if (me.role === 'admin' && params.get('as')) acting = params.get('as');
+  const ig = params.get('ig');
+  if (ig) {
+    history.replaceState(null, '', '/admin');
+    setTimeout(() => toast({ connected: 'Instagram connected!', cancelled: 'Instagram connection cancelled',
+      error: 'Could not connect Instagram. Please try again.' }[ig] || ''), 300);
+  }
+  start();
+}).catch(showLogin);
 </script>
 </body>
 </html>

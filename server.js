@@ -77,6 +77,7 @@ if (!db.users.some(u => u.role === 'admin')) {
 const publicUser = u => ({
   id: u.id, username: u.username, businessName: u.businessName, role: u.role,
   screenKey: u.screenKey, settings: u.settings, lastSeen: u.lastSeen, createdAt: u.createdAt,
+  instagram: u.instagram ? u.instagram.username : null,
 });
 
 function bump(user) { user.version = (user.version || 0) + 1; }
@@ -168,7 +169,14 @@ const upload = multer({
     filename: (req, file, cb) => cb(null, newId(12) + path.extname(file.originalname).toLowerCase().replace(/[^.a-z0-9]/g, '')),
   }),
   limits: { fileSize: MAX_UPLOAD_MB * 1024 * 1024 },
-  fileFilter: (req, file, cb) => cb(null, /^(image|video)\//.test(file.mimetype)),
+  fileFilter: (req, file, cb) => {
+    if (/^image\/hei[cf]$/i.test(file.mimetype) || /\.hei[cf]$/i.test(file.originalname)) {
+      const err = new Error('iPhone HEIC photos can\'t be shown on the screen. Save the photo as JPG first, or take a screenshot of it and upload that.');
+      err.status = 400;
+      return cb(err);
+    }
+    cb(null, /^(image|video)\//.test(file.mimetype));
+  },
 });
 
 const adsFor = userId => db.ads.filter(a => a.ownerId === userId).sort((a, b) => a.order - b.order);
@@ -366,6 +374,9 @@ app.delete('/api/users/:id', auth, adminOnly, (req, res) => {
   res.json({ ok: true });
 });
 
+// ---------------------------------------------------------------- Instagram
+require('./instagram')(app, { db, save, newId, auth, target, adsFor, bump, MEDIA_DIR, MAX_UPLOAD_MB });
+
 // ---------------------------------------------------------------- player (public, by secret screen key)
 const today = () => new Date().toISOString().slice(0, 10);
 let lastSeenWrite = 0;
@@ -414,6 +425,7 @@ app.use((err, req, res, next) => {
   if (err instanceof multer.MulterError) {
     return res.status(400).json({ error: err.code === 'LIMIT_FILE_SIZE' ? `File too large (max ${MAX_UPLOAD_MB} MB)` : err.message });
   }
+  if (err.status) return res.status(err.status).json({ error: err.message });
   console.error(err);
   res.status(500).json({ error: 'Server error' });
 });
