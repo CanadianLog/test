@@ -1,0 +1,23 @@
+# Render Blueprint for the Ad Screen app (in the ad-screen/ folder).
+# Render dashboard → New → Blueprint → pick this repo.
+services:
+  - type: web
+    name: ad-screen
+    runtime: node
+    plan: starter            # free plan has no permanent disk, so ads would be lost
+    rootDir: ad-screen
+    branch: claude/confident-allen-8s9kqy
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /admin
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATA_DIR
+        value: /data         # must match the disk mount path below
+      - key: ADMIN_PASSWORD
+        sync: false          # Render asks you to type this in when you create it
+    disk:
+      name: ad-data
+      mountPath: /data
+      sizeGB: 5

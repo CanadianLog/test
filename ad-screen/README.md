@@ -17,6 +17,8 @@ ADMIN_PASSWORD='choose-a-strong-one' npm start
 # → http://your-server:3000/admin   (username: admin)
 ```
 
+**On Render:** the repo includes a `render.yaml` at the top level. In the Render dashboard choose **New → Blueprint**, pick this repo, enter an `ADMIN_PASSWORD`, and it creates the service on the Starter plan with a 5 GB disk at `/data`. The free plan won't work, because it has no permanent disk and uploaded ads would disappear on every restart.
+
 Or with Docker:
 
 ```bash
