@@ -1,11 +1,10 @@
-# Render Blueprint for the Ad Screen app (in the ad-screen/ folder).
+# Render Blueprint for the Ad Screen app.
 # Render dashboard → New → Blueprint → pick this repo.
 services:
   - type: web
     name: ad-screen
     runtime: node
     plan: starter            # free plan has no permanent disk, so ads would be lost
-    rootDir: ad-screen
     branch: claude/confident-allen-8s9kqy
     buildCommand: npm ci
     startCommand: npm start

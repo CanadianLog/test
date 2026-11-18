@@ -11,13 +11,12 @@ Turns a Chromebook plugged into a TV/monitor into an advertising screen, with a 
 The server has to be reachable on the internet so the Chromebook and your customer can both use it. Any small VPS (DigitalOcean, Linode, Hetzner, etc., about $5 a month) or a host like Render or Railway with a persistent disk will work.
 
 ```bash
-cd ad-screen
 npm install
 ADMIN_PASSWORD='choose-a-strong-one' npm start
 # → http://your-server:3000/admin   (username: admin)
 ```
 
-**On Render:** the repo includes a `render.yaml` at the top level. In the Render dashboard choose **New → Blueprint**, pick this repo, enter an `ADMIN_PASSWORD`, and it creates the service on the Starter plan with a 5 GB disk at `/data`. The free plan won't work, because it has no permanent disk and uploaded ads would disappear on every restart.
+**On Render:** the repo includes a `render.yaml`. In the Render dashboard choose **New → Blueprint**, pick this repo, enter an `ADMIN_PASSWORD`, and it creates the service on the Starter plan with a 5 GB disk at `/data`. The free plan won't work, because it has no permanent disk and uploaded ads would disappear on every restart.
 
 Or with Docker:
 
