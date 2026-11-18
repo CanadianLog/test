@@ -12,7 +12,11 @@
   #screen { position: fixed; top: 50%; left: 50%; width: 100vw; height: 100vh; overflow: hidden;
             transform: translate(-50%, -50%) rotate(var(--rot, 0deg)); }
   #screen.portrait { width: 100vh; height: 100vw; }
-  #stage { position: absolute; inset: 0; }
+  /* --edge shrinks everything for TVs that cut off the picture's edges (overscan) */
+  #stage { position: absolute; inset: var(--edge, 0); overflow: hidden; }
+  .blurwrap .bg { position: absolute; inset: -6%; width: 112%; height: 112%; object-fit: cover;
+                  filter: blur(40px) brightness(.7); }
+  .blurwrap .fg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
   .slide { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity .8s ease, transform .8s ease; }
   .slide.show { opacity: 1; transform: none; }
   .t-none .slide { transition: none; }
@@ -97,6 +101,7 @@
     const screen = document.getElementById('screen');
     screen.style.setProperty('--rot', rot + 'deg');
     screen.classList.toggle('portrait', rot === 90 || rot === 270);
+    screen.style.setProperty('--edge', (Number(s.edgeMargin) || 0) + '%');
   }
 
   function showMessage(title, sub) {
@@ -162,10 +167,11 @@
 
   function show(item) {
     const s = playlist.settings || {};
-    const el = document.createElement(item.type === 'video' ? 'video' : item.type === 'youtube' ? 'div' : 'img');
+    const blurFill = item.type === 'image' && s.fit === 'blur';
+    const el = document.createElement(item.type === 'video' ? 'video' : (item.type === 'youtube' || blurFill) ? 'div' : 'img');
     pending = el;
     el.className = 'slide';
-    el.style.objectFit = s.fit || 'contain';
+    el.style.objectFit = s.fit === 'cover' ? 'cover' : 'contain';
     let advanced = false;
     const advance = () => { if (!advanced) { advanced = true; next(); } };
 
@@ -242,6 +248,16 @@
         timer = setTimeout(advance, (Math.max(len, 1) + 5) * 1000);
       };
       el.src = item.url;
+      stage.append(el);
+    } else if (blurFill) {
+      // whole picture visible, empty space filled with a blurred copy of it
+      el.classList.add('blurwrap');
+      const bg = new Image(), fg = new Image();
+      bg.className = 'bg'; fg.className = 'fg';
+      fg.onload = () => { reveal(); timer = setTimeout(advance, (item.duration || 10) * 1000); };
+      fg.onerror = el.onerror;
+      bg.src = fg.src = item.url;
+      el.append(bg, fg);
       stage.append(el);
     } else {
       el.onload = () => { reveal(); timer = setTimeout(advance, (item.duration || 10) * 1000); };
