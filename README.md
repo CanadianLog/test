@@ -44,7 +44,8 @@ Log in as admin → **Customers** → add their business name, username and pass
 
 1. Sign in on the Chromebook. Log in to the dashboard as the customer (or as admin, then **Manage ads**), open the **Screen** tab and open the **screen link**.
 2. **Install it as an app**: click the install icon in the address bar, or ⋮ → *Cast, save, and share* → *Install page as app*. The app opens full screen with no browser bars.
-3. **Start it automatically**: Settings → *Apps* → *Ad Screen* (or right-click it in the Launcher → *App info*) → turn on **Open at login / Run on OS login**.
+3. **Start it automatically**: Settings → *Apps* → **Restore apps on startup** → **Always restore**. Leave the Ad Screen app open when the Chromebook is turned off (don't close its window). After sign-in, ChromeOS reopens it.
+   Personal Chromebooks have no "open this app at every login" switch. That needs a managed Chromebook (see *Fully hands-off* below), where the Admin console can auto-launch the app.
 4. **Keep the screen on**: Settings → *Device* → *Power* → When idle: **Keep display on**. If the lid is closed, turn off *Sleep when cover is closed*.
 5. Turn off the lock screen on wake (Settings → *Security and privacy* → *Lock screen*).
 
@@ -74,39 +75,20 @@ In **My ads**, paste a YouTube link (normal video, `youtu.be` short link, or Sho
 - YouTube may play its own ads before some videos, which YouTube and the video's owner control. To avoid that, upload the video file instead (best for the customer's own videos).
 - For vertical screens, YouTube **Shorts** fill the screen best.
 
-## Instagram
+## Instagram Reels
 
-There are two ways to get Instagram posts onto the screen.
+Save the Reel from the Instagram app, then upload it like any other video:
 
-**1. Save and upload (works now, no setup).** The customer saves their own Reel from the Instagram app (⋯ → *Download* / *Save to device*), then uploads it from their phone in the dashboard. The dashboard has these steps under *My ads → Instagram*.
+1. In the Instagram app, open your Reel → **⋯** (or the share button) → **Download** / **Save to device**.
+2. Open the dashboard on your phone → **My ads** → **Choose pictures or videos** → pick the video.
 
-**2. Connect Instagram (one-time setup by you).** The customer clicks **Connect Instagram**, then picks posts to put on the screen, or turns on **Automatically add new Reels**, which checks every 30 minutes. The server copies each post, so it also plays when the internet is down. This uses Instagram's official API, so:
+You can only download your own Reels. Reels with licensed music may download without sound. iPhone **HEIC** photos are rejected with a message, because Chrome can't display them. Upload a JPG or a screenshot instead.
 
-- The customer's Instagram must be a **Business or Creator** account. They can switch for free: Instagram app → Settings → *Account type and tools*.
-- You need a free **Meta developer app**. Set it up once for all your customers:
+## Short links
 
-1. Go to **developers.facebook.com** → *My Apps* → **Create app**. Choose the use case for managing content on Instagram (Meta renames these menus from time to time).
-2. In the app, open **Instagram → API setup with Instagram login**. Copy the **Instagram app ID** and **Instagram app secret**. These are *not* the Facebook app ID.
-3. Under **Set up Instagram business login → Business login settings**, add this **OAuth redirect URI**:
-   `https://YOUR-SITE/auth/instagram/callback`
-   (for example `https://ad-screen-9s7k.onrender.com/auth/instagram/callback`). The admin dashboard shows the exact address under *My ads → Instagram* until it's set up.
-4. In Render → your service → **Environment**, add:
-   - `IG_APP_ID` = the Instagram app ID
-   - `IG_APP_SECRET` = the Instagram app secret
-   - `PUBLIC_URL` = `https://YOUR-SITE` (optional, but recommended if you add your own domain)
-
-   Save. Render restarts the app.
-5. **Let your customer connect.** While the Meta app is in *Development* mode, only accounts you invite can connect:
-   - Meta app → *App roles → Roles* → **Add Instagram testers** → enter the customer's Instagram username.
-   - The customer accepts the invite in Instagram: Settings → *Website permissions → Apps and websites → Tester invites*, or at instagram.com/accounts/manage_access.
-
-   That's fine for a handful of customers. To let anyone connect without an invite, submit the app for Meta's *App Review* (permission `instagram_business_basic`).
-
-Notes:
-- Access is renewed automatically. If Instagram ever cancels it (password change, access removed), the dashboard shows **Reconnect Instagram**.
-- Auto-add only picks up Reels posted *after* it's switched on, so it won't flood the screen with old posts.
-- Some Reels that use licensed music can't be copied. Instagram doesn't provide their file.
-- iPhone **HEIC** photos are rejected with a message, because Chrome can't display them. Upload a JPG or a screenshot instead.
+- **Dashboard:** just the site address. `/` sends people to the login page.
+- **Screen:** every account gets a short screen link like `/tv/joes-pizza`, made from the business name. Change it in **Screen → Short link name**. The short link forwards to the full `/screen/<key>` link, so it works for installing the app on the Chromebook and as a kiosk URL.
+- **Your own domain** (for example `ads.yourbusiness.ca`): Render → service → **Settings → Custom Domains → Add**, then add the DNS record Render shows at your domain provider. HTTPS is set up for you.
 
 ## Tips
 

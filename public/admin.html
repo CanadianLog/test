@@ -49,15 +49,6 @@
   .handle { cursor: grab; color: var(--muted); text-align: center; user-select: none; font-size: 18px; }
   .thumb { width: 120px; aspect-ratio: 16/9; object-fit: cover; border-radius: 6px; background: #000; display: block; }
   .portrait .thumb { aspect-ratio: 9/16; width: 68px; margin: 0 26px; }
-  .iglogo { width: 22px; height: 22px; border-radius: 6px; display: inline-block;
-            background: radial-gradient(circle at 30% 107%, #fdf497 0%, #fd5949 45%, #d6249f 60%, #285AEB 90%); }
-  .iggrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
-  .igitem { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; }
-  .igitem img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: #000; }
-  .igitem .meta { padding: 8px; display: flex; flex-direction: column; gap: 6px; flex: 1; font-size: 12px; }
-  .igitem .cap { color: var(--muted); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; flex: 1; }
-  .igitem button { padding: 5px 8px; font-size: 13px; }
-  .problem { color: var(--danger); margin: 0 0 10px; }
   details summary { cursor: pointer; color: var(--accent); font-weight: 600; }
   .ytthumb { position: relative; display: block; }
   .ytthumb::after { content: '▶'; position: absolute; inset: 0; margin: auto; width: 30px; height: 21px; border-radius: 6px;
@@ -147,16 +138,8 @@
           <div style="flex:0 0 auto"><button class="primary">Add YouTube video</button></div>
         </form>
         <small class="muted">YouTube videos need internet to play, and the video's owner must allow embedding.</small>
-      </div>
-
-      <div class="card" id="igCard">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-          <h2 style="margin:0;display:flex;align-items:center;gap:8px"><span class="iglogo"></span> Instagram</h2>
-          <div id="igActions" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"></div>
-        </div>
-        <div id="igBody" style="margin-top:12px"></div>
         <details style="margin-top:14px">
-          <summary>Put a Reel on the screen from your phone (no connection needed)</summary>
+          <summary>How to put an Instagram Reel on the screen</summary>
           <ol class="steps" style="margin-top:10px">
             <li>In the Instagram app, open your Reel or video post.</li>
             <li>Tap <b>⋯</b> (or the share ✈ button) → <b>Download</b> / <b>Save to device</b>. It goes to your photos.</li>
@@ -187,6 +170,15 @@
           <button id="copyUrl">Copy</button>
           <button id="openUrl">Preview</button>
         </div>
+        <div style="height:12px"></div>
+        <label>Short link name</label>
+        <form id="shortForm" class="linkbox" style="align-items:center">
+          <span class="muted" id="shortPrefix" style="white-space:nowrap;font-family:ui-monospace,monospace;font-size:13px"></span>
+          <input id="sShort" maxlength="30" autocapitalize="none" autocomplete="off" spellcheck="false" style="min-width:0">
+          <button>Save</button>
+        </form>
+        <small class="muted">Letters, numbers and dashes. Changing it breaks the old short link, so update the Chromebook too.</small>
+        <p class="muted" style="font-size:13px;margin:12px 0 0">Dashboard login for the customer: <b id="loginUrl"></b></p>
         <div style="height:12px"></div>
         <button id="refreshScreens">Reload screen now</button>
       </div>
@@ -238,7 +230,7 @@
         <ol class="steps">
           <li>On the Chromebook, sign in and open the <b>screen link</b> above in Chrome.</li>
           <li>Install it as an app: click the <b>install icon</b> (⊕ / monitor with arrow) at the right of the address bar, or ⋮ menu → <b>Cast, save, and share → Install page as app</b>. It opens full screen with no browser bars.</li>
-          <li>Make it start automatically: open the <b>Launcher</b>, right-click the <b>Ad Screen</b> app → <b>App info</b> (or Settings → Apps → Ad Screen) and turn on <b>“Open at login” / “Run on OS login”</b>.</li>
+          <li>Make it start automatically: Settings → <b>Apps</b> → <b>Restore apps on startup</b> → choose <b>Always restore</b>. Leave the Ad Screen app open when you turn the Chromebook off (don't close it), and it reopens by itself after sign-in.</li>
           <li>Keep the screen on: Settings → <b>Device → Power</b> → “When idle”: <b>Keep display on</b>, and turn off “Sleep when cover is closed” if the lid is closed.</li>
           <li>Optional, so it boots without typing a password: Settings → <b>Security and privacy → Lock screen</b> → turn off “Show lock screen when waking from sleep”. For a fully hands-off kiosk see the README.</li>
         </ol>
@@ -342,7 +334,6 @@ async function start() {
   $('#who').textContent = me.username;
   $$('[data-admin]').forEach(x => (x.hidden = me.role !== 'admin'));
   await loadAds();
-  loadInstagram();
   if (me.role === 'admin') loadUsers();
 }
 
@@ -498,8 +489,11 @@ function upload(files) {
 
 // ---------------- screen
 function renderScreen() {
-  const url = `${location.origin}/screen/${account.screenKey}`;
+  const url = `${location.origin}/tv/${account.shortCode}`;
   $('#screenUrl').value = url;
+  $('#shortPrefix').textContent = location.host + '/tv/';
+  $('#sShort').value = account.shortCode;
+  $('#loginUrl').textContent = location.host;
   const s = account.settings;
   $('#sBiz').value = account.businessName;
   $('#sRot').value = String(s.rotation || 0);
@@ -512,7 +506,12 @@ function renderScreen() {
   $('#status').append(el('span', { class: 'dot' + (online ? ' on' : '') }),
     online ? 'Screen is online and playing.' : seen ? `Screen last seen ${seen.toLocaleString()}.` : 'Screen has not connected yet.');
 }
-$('#copyUrl').onclick = () => navigator.clipboard.writeText($('#screenUrl').value).then(() => toast('Link copied'));
+$('#shortForm').onsubmit = e => {
+  e.preventDefault();
+  api('/api/settings' + asParam(), { method: 'PATCH', body: { shortCode: $('#sShort').value } })
+    .then(u => { account = u; renderScreen(); toast('Short link saved: ' + location.host + '/tv/' + u.shortCode); }).catch(fail);
+};
+$('#copyUrl').onclick =() => navigator.clipboard.writeText($('#screenUrl').value).then(() => toast('Link copied'));
 $('#openUrl').onclick = () => window.open($('#screenUrl').value, '_blank');
 $('#refreshScreens').onclick = () => api('/api/screen/refresh' + asParam(), { method: 'POST' }).then(() => toast('Screen will reload within 30 seconds')).catch(fail);
 $('#saveSettings').onclick = () => api('/api/settings' + asParam(), { method: 'PATCH', body: {
@@ -560,9 +559,8 @@ function manage(id) {
   acting = id;
   $$('nav button')[0].click();
   loadAds();
-  loadInstagram();
 }
-$('#stopActing').onclick = () => { acting = null; loadAds(); loadInstagram(); };
+$('#stopActing').onclick = () => { acting = null; loadAds(); };
 $('#newUser').onsubmit = e => {
   e.preventDefault();
   const f = Object.fromEntries(new FormData(e.target));
@@ -574,94 +572,8 @@ if (matchMedia('(pointer: coarse)').matches) {
   $('#dropText').innerHTML = '<b>Choose pictures or videos</b><br>from your phone\'s photos';
 }
 
-// ---------------- Instagram
-let igState = null;
-async function loadInstagram() {
-  const card = $('#igCard'), actions = $('#igActions'), body = $('#igBody');
-  actions.innerHTML = ''; body.innerHTML = '';
-  try { igState = await api('/api/instagram' + asParam()); } catch (e) { return; }
-  const ig = igState;
-
-  if (!ig.configured) {
-    if (me.role === 'admin') {
-      body.append(el('p', { class: 'muted', style: 'margin:0' },
-        'Instagram connection is not switched on yet. It needs a free Meta developer app: see "Instagram" in the README. ',
-        'Redirect URL to give Meta: ', el('code', {}, ig.redirectUri)));
-    } else {
-      body.append(el('p', { class: 'muted', style: 'margin:0' }, 'To show an Instagram Reel, save it to your phone and upload it (steps below).'));
-    }
-    return;
-  }
-
-  const connectBtn = label => el('button', { class: 'primary', onclick: () => (location.href = '/auth/instagram/start' + asParam()) }, label);
-  if (!ig.connected) {
-    actions.append(connectBtn('Connect Instagram'));
-    body.append(el('p', { class: 'muted', style: 'margin:0' },
-      'Connect your Instagram to pick posts for the screen, or have new Reels added automatically. ',
-      'Your account must be a Business or Creator account (Instagram app → Settings → Account type).'));
-    return;
-  }
-
-  actions.append(
-    el('span', { class: 'muted' }, 'Connected as ', el('b', {}, '@' + ig.username)),
-    el('button', { onclick: () => {
-      if (!confirm('Disconnect Instagram? Posts already on the screen stay there.')) return;
-      api('/api/instagram/disconnect' + asParam(), { method: 'POST' }).then(() => { toast('Instagram disconnected'); loadInstagram(); }).catch(fail);
-    } }, 'Disconnect'),
-  );
-  if (ig.problem) {
-    body.append(el('p', { class: 'problem' }, ig.problem + ' '), connectBtn('Reconnect Instagram'));
-    return;
-  }
-  body.append(
-    el('label', { class: 'switch', style: 'margin-bottom:12px;color:var(--text)' },
-      el('input', { type: 'checkbox', checked: ig.autoAdd, onchange: e =>
-        api('/api/instagram' + asParam(), { method: 'PATCH', body: { autoAdd: e.target.checked } })
-          .then(r => toast(r.autoAdd ? 'New Reels will be added to the screen automatically' : 'Auto-add turned off')).catch(fail) }),
-      'Automatically add new Reels to the screen (checked every 30 minutes)'),
-    el('div', { id: 'igGrid' }, el('button', { onclick: loadIgMedia }, 'Show my Instagram posts')),
-  );
-}
-
-async function loadIgMedia() {
-  const grid = $('#igGrid');
-  grid.innerHTML = '<p class="muted">Loading your posts…</p>';
-  let media;
-  try { media = await api('/api/instagram/media' + asParam()); }
-  catch (e) { grid.innerHTML = ''; grid.append(el('p', { class: 'problem' }, e.message)); return loadInstagram(); }
-  grid.innerHTML = '';
-  if (!media.length) { grid.append(el('p', { class: 'muted' }, 'No photos or videos found on this account.')); return; }
-  grid.className = 'iggrid';
-  media.forEach(m => {
-    const btn = el('button', { class: m.added ? '' : 'primary', disabled: m.added }, m.added ? 'On screen ✓' : 'Add to screen');
-    btn.onclick = () => {
-      btn.disabled = true; btn.textContent = m.type === 'video' ? 'Copying video…' : 'Adding…';
-      api('/api/instagram/add' + asParam(), { method: 'POST', body: { id: m.id } })
-        .then(() => { btn.textContent = 'On screen ✓'; btn.className = ''; toast('Added to your screen'); loadAds(); })
-        .catch(e => { btn.disabled = false; btn.textContent = 'Add to screen'; fail(e); });
-    };
-    grid.append(el('div', { class: 'igitem' },
-      el('a', { href: m.permalink, target: '_blank', rel: 'noopener' }, el('img', { src: m.thumb, alt: '', loading: 'lazy' })),
-      el('div', { class: 'meta' },
-        el('span', { class: 'tag' }, m.reel ? 'Reel' : m.type === 'video' ? 'Video' : 'Photo'),
-        el('span', { class: 'cap' }, m.caption || ''),
-        btn)));
-  });
-}
-
 // ---------------- boot
-const params = new URLSearchParams(location.search);
-api('/api/me').then(u => {
-  me = u;
-  if (me.role === 'admin' && params.get('as')) acting = params.get('as');
-  const ig = params.get('ig');
-  if (ig) {
-    history.replaceState(null, '', '/admin');
-    setTimeout(() => toast({ connected: 'Instagram connected!', cancelled: 'Instagram connection cancelled',
-      error: 'Could not connect Instagram. Please try again.' }[ig] || ''), 300);
-  }
-  start();
-}).catch(showLogin);
+api('/api/me').then(u => { me = u; start(); }).catch(showLogin);
 </script>
 </body>
 </html>
