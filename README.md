@@ -109,6 +109,12 @@ Notes:
 - Some Reels that use licensed music can't be copied. Instagram doesn't provide their file.
 - iPhone **HEIC** photos are rejected with a message, because Chrome can't display them. Upload a JPG or a screenshot instead.
 
+## Short links
+
+- **Dashboard:** just the site address. `/` sends people to the login page.
+- **Screen:** every account gets a short screen link like `/tv/joes-pizza`, made from the business name. Change it in **Screen → Short link name**. The short link forwards to the full `/screen/<key>` link, so it works for installing the app on the Chromebook and as a kiosk URL.
+- **Your own domain** (for example `ads.yourbusiness.ca`): Render → service → **Settings → Custom Domains → Add**, then add the DNS record Render shows at your domain provider. HTTPS is set up for you. If you use Instagram, also set `PUBLIC_URL` and update the redirect URI in the Meta app.
+
 ## Tips
 
 - Pictures: use 1920×1080 landscape JPG or PNG. Videos: use MP4 (H.264). Videos play all the way through and are muted unless you turn off *Mute video sound* in Screen settings.

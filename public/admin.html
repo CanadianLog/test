@@ -188,6 +188,15 @@
           <button id="openUrl">Preview</button>
         </div>
         <div style="height:12px"></div>
+        <label>Short link name</label>
+        <form id="shortForm" class="linkbox" style="align-items:center">
+          <span class="muted" id="shortPrefix" style="white-space:nowrap;font-family:ui-monospace,monospace;font-size:13px"></span>
+          <input id="sShort" maxlength="30" autocapitalize="none" autocomplete="off" spellcheck="false" style="min-width:0">
+          <button>Save</button>
+        </form>
+        <small class="muted">Letters, numbers and dashes. Changing it breaks the old short link, so update the Chromebook too.</small>
+        <p class="muted" style="font-size:13px;margin:12px 0 0">Dashboard login for the customer: <b id="loginUrl"></b></p>
+        <div style="height:12px"></div>
         <button id="refreshScreens">Reload screen now</button>
       </div>
 
@@ -498,8 +507,11 @@ function upload(files) {
 
 // ---------------- screen
 function renderScreen() {
-  const url = `${location.origin}/screen/${account.screenKey}`;
+  const url = `${location.origin}/tv/${account.shortCode}`;
   $('#screenUrl').value = url;
+  $('#shortPrefix').textContent = location.host + '/tv/';
+  $('#sShort').value = account.shortCode;
+  $('#loginUrl').textContent = location.host;
   const s = account.settings;
   $('#sBiz').value = account.businessName;
   $('#sRot').value = String(s.rotation || 0);
@@ -512,7 +524,12 @@ function renderScreen() {
   $('#status').append(el('span', { class: 'dot' + (online ? ' on' : '') }),
     online ? 'Screen is online and playing.' : seen ? `Screen last seen ${seen.toLocaleString()}.` : 'Screen has not connected yet.');
 }
-$('#copyUrl').onclick = () => navigator.clipboard.writeText($('#screenUrl').value).then(() => toast('Link copied'));
+$('#shortForm').onsubmit = e => {
+  e.preventDefault();
+  api('/api/settings' + asParam(), { method: 'PATCH', body: { shortCode: $('#sShort').value } })
+    .then(u => { account = u; renderScreen(); toast('Short link saved: ' + location.host + '/tv/' + u.shortCode); }).catch(fail);
+};
+$('#copyUrl').onclick =() => navigator.clipboard.writeText($('#screenUrl').value).then(() => toast('Link copied'));
 $('#openUrl').onclick = () => window.open($('#screenUrl').value, '_blank');
 $('#refreshScreens').onclick = () => api('/api/screen/refresh' + asParam(), { method: 'POST' }).then(() => toast('Screen will reload within 30 seconds')).catch(fail);
 $('#saveSettings').onclick = () => api('/api/settings' + asParam(), { method: 'PATCH', body: {

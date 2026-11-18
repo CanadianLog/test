@@ -41,6 +41,17 @@ function checkPassword(user, password) {
   return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(user.hash, 'hex'));
 }
 
+// Short, readable screen links: /tv/joes-pizza instead of /screen/<24-character key>
+const SHORT_RE = /^[a-z0-9](?:[a-z0-9-]{1,28}[a-z0-9])$/;
+const slugify = s => String(s || '').toLowerCase().normalize('NFKD').replace(/[̀-ͯ]/g, '')
+  .replace(/['’]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30).replace(/-+$/, '');
+function uniqueShortCode(wanted, exceptUserId) {
+  const base = SHORT_RE.test(wanted) ? wanted : 'screen';
+  const taken = c => db.users.some(u => u.shortCode === c && u.id !== exceptUserId);
+  if (!taken(base)) return base;
+  for (let i = 2; ; i++) if (!taken(`${base.slice(0, 26)}-${i}`)) return `${base.slice(0, 26)}-${i}`;
+}
+
 function createUser({ username, password, role = 'customer', businessName = '' }) {
   const { salt, hash } = hashPassword(password);
   const user = {
@@ -51,6 +62,7 @@ function createUser({ username, password, role = 'customer', businessName = '' }
     salt,
     hash,
     screenKey: newId(12),
+    shortCode: uniqueShortCode(slugify(businessName || username)),
     settings: { transition: 'fade', defaultDuration: 10, muteVideos: true, fit: 'blur', edgeMargin: 0, background: '#000000', rotation: 0 },
     version: 1,
     lastSeen: null,
@@ -60,6 +72,13 @@ function createUser({ username, password, role = 'customer', businessName = '' }
   save();
   return user;
 }
+
+// Accounts created before short links existed get one now
+let backfilled = false;
+for (const u of db.users) {
+  if (!u.shortCode) { u.shortCode = uniqueShortCode(slugify(u.businessName || u.username), u.id); backfilled = true; }
+}
+if (backfilled) save();
 
 // First run: create the admin account
 if (!db.users.some(u => u.role === 'admin')) {
@@ -78,6 +97,7 @@ const publicUser = u => ({
   id: u.id, username: u.username, businessName: u.businessName, role: u.role,
   screenKey: u.screenKey, settings: u.settings, lastSeen: u.lastSeen, createdAt: u.createdAt,
   instagram: u.instagram ? u.instagram.username : null,
+  shortCode: u.shortCode,
 });
 
 function bump(user) { user.version = (user.version || 0) + 1; }
@@ -311,6 +331,13 @@ app.patch('/api/settings', auth, (req, res) => {
   if (!u) return res.status(404).json({ error: 'Account not found' });
   const b = req.body || {};
   const s = u.settings;
+  // check the short link name first, so a rejected name changes nothing
+  let newCode = null;
+  if (typeof b.shortCode === 'string' && b.shortCode.trim().toLowerCase() !== u.shortCode) {
+    newCode = b.shortCode.trim().toLowerCase();
+    if (!SHORT_RE.test(newCode)) return res.status(400).json({ error: 'Short link name: 3–30 letters, numbers or dashes (no spaces)' });
+    if (db.users.some(x => x.shortCode === newCode && x.id !== u.id)) return res.status(400).json({ error: `“${newCode}” is already taken. Try another name.` });
+  }
   if (['fade', 'slide', 'none'].includes(b.transition)) s.transition = b.transition;
   if (['blur', 'contain', 'cover'].includes(b.fit)) s.fit = b.fit;
   if (b.edgeMargin !== undefined) s.edgeMargin = Math.min(10, Math.max(0, Number(b.edgeMargin) || 0));
@@ -319,6 +346,7 @@ app.patch('/api/settings', auth, (req, res) => {
   if (typeof b.muteVideos === 'boolean') s.muteVideos = b.muteVideos;
   if (typeof b.background === 'string' && /^#[0-9a-f]{6}$/i.test(b.background)) s.background = b.background;
   if (typeof b.businessName === 'string' && b.businessName.trim()) u.businessName = b.businessName.trim().slice(0, 80);
+  if (newCode) u.shortCode = newCode;
   bump(u); save();
   res.json(publicUser(u));
 });
@@ -410,6 +438,13 @@ app.get('/screen/:key/manifest.webmanifest', (req, res) => {
     theme_color: '#000000',
     icons: [{ src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
   }));
+});
+
+app.get('/tv/:code', (req, res) => {
+  const u = db.users.find(x => x.shortCode === String(req.params.code).toLowerCase());
+  if (!u) return res.status(404).send('Unknown screen link');
+  res.set('Cache-Control', 'no-store');
+  res.redirect(302, `/screen/${u.screenKey}`);
 });
 
 app.get('/screen/:key', (req, res) => {
