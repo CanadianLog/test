@@ -210,7 +210,18 @@
           <div><label>Transition</label>
             <select id="sTransition"><option value="fade">Fade</option><option value="slide">Slide</option><option value="none">None</option></select></div>
           <div><label>Picture fit</label>
-            <select id="sFit"><option value="contain">Show whole picture</option><option value="cover">Fill screen (may crop)</option></select></div>
+            <select id="sFit">
+              <option value="blur">Whole picture, blurred edges (recommended)</option>
+              <option value="contain">Whole picture, plain background</option>
+              <option value="cover">Fill screen (cuts off edges)</option>
+            </select></div>
+          <div><label>Edges cut off by the TV?</label>
+            <select id="sEdge">
+              <option value="0">No — use full screen</option>
+              <option value="2">Shrink a little (2%)</option>
+              <option value="4">Shrink more (4%)</option>
+              <option value="6">Shrink a lot (6%)</option>
+            </select></div>
         </div>
         <div style="height:12px"></div>
         <div class="row">
@@ -493,6 +504,7 @@ function renderScreen() {
   $('#sBiz').value = account.businessName;
   $('#sRot').value = String(s.rotation || 0);
   $('#sTransition').value = s.transition; $('#sFit').value = s.fit;
+  $('#sEdge').value = String(s.edgeMargin || 0);
   $('#sDur').value = s.defaultDuration; $('#sBg').value = s.background; $('#sMute').checked = s.muteVideos;
   const seen = account.lastSeen && new Date(account.lastSeen);
   const online = seen && Date.now() - seen < 2 * 60 * 1000;
@@ -506,7 +518,7 @@ $('#refreshScreens').onclick = () => api('/api/screen/refresh' + asParam(), { me
 $('#saveSettings').onclick = () => api('/api/settings' + asParam(), { method: 'PATCH', body: {
   businessName: $('#sBiz').value, transition: $('#sTransition').value, fit: $('#sFit').value,
   defaultDuration: +$('#sDur').value, background: $('#sBg').value, muteVideos: $('#sMute').checked,
-  rotation: +$('#sRot').value,
+  rotation: +$('#sRot').value, edgeMargin: +$('#sEdge').value,
 } }).then(u => { account = u; renderScreen(); applyOrientation(); $('#bizName').textContent = u.businessName; toast('Settings saved'); }).catch(fail);
 
 // ---------------- account
