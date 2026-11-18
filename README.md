@@ -44,7 +44,8 @@ Log in as admin → **Customers** → add their business name, username and pass
 
 1. Sign in on the Chromebook. Log in to the dashboard as the customer (or as admin, then **Manage ads**), open the **Screen** tab and open the **screen link**.
 2. **Install it as an app**: click the install icon in the address bar, or ⋮ → *Cast, save, and share* → *Install page as app*. The app opens full screen with no browser bars.
-3. **Start it automatically**: Settings → *Apps* → *Ad Screen* (or right-click it in the Launcher → *App info*) → turn on **Open at login / Run on OS login**.
+3. **Start it automatically**: Settings → *Apps* → **Restore apps on startup** → **Always restore**. Leave the Ad Screen app open when the Chromebook is turned off (don't close its window). After sign-in, ChromeOS reopens it.
+   Personal Chromebooks have no "open this app at every login" switch. That needs a managed Chromebook (see *Fully hands-off* below), where the Admin console can auto-launch the app.
 4. **Keep the screen on**: Settings → *Device* → *Power* → When idle: **Keep display on**. If the lid is closed, turn off *Sleep when cover is closed*.
 5. Turn off the lock screen on wake (Settings → *Security and privacy* → *Lock screen*).
 
