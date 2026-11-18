@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ad Screen</title>
+<meta name="theme-color" content="#000000">
+<link rel="icon" href="/icon.svg">
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; cursor: none; }
+  /* #screen is rotated as a whole so the TV can be mounted vertically */
+  #screen { position: fixed; top: 50%; left: 50%; width: 100vw; height: 100vh; overflow: hidden;
+            transform: translate(-50%, -50%) rotate(var(--rot, 0deg)); }
+  #screen.portrait { width: 100vh; height: 100vw; }
+  #stage { position: absolute; inset: 0; }
+  .slide { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity .8s ease, transform .8s ease; }
+  .slide.show { opacity: 1; transform: none; }
+  .t-none .slide { transition: none; }
+  .t-slide .slide { transform: translateX(100%); opacity: 1; }
+  .t-slide .slide.show { transform: translateX(0); }
+  .t-slide .slide.out { transform: translateX(-100%); }
+  img.slide, video.slide { object-fit: contain; background: transparent; }
+  .slide.yt iframe { width: 100%; height: 100%; border: 0; display: block; pointer-events: none; }
+  #msg { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column;
+         color: #bbb; font: 600 5vmin/1.3 system-ui, sans-serif; text-align: center; padding: 6vmin; box-sizing: border-box; }
+  #msg small { font-size: 2.4vmin; font-weight: 400; color: #777; margin-top: 1em; }
+  #tap { position: fixed; bottom: 2vh; left: 50%; transform: translateX(-50%); color: #fff; background: rgba(0,0,0,.6);
+         font: 16px system-ui, sans-serif; padding: 10px 18px; border-radius: 30px; cursor: pointer; display: none; }
+</style>
+<script>
+  // Per-screen manifest so the page can be installed as a full-screen app that starts at login
+  const KEY = location.pathname.split('/')[2];
+  document.write('<link rel="manifest" href="/screen/' + KEY + '/manifest.webmanifest">');
+</script>
+</head>
+<body>
+<div id="screen">
+  <div id="stage"></div>
+  <div id="msg" hidden></div>
+</div>
+<div id="tap">Click for full screen</div>
+<script>
+(() => {
+  const stage = document.getElementById('stage');
+  const msg = document.getElementById('msg');
+  const tap = document.getElementById('tap');
+  const PLAYLIST_URL = `/api/screen/${KEY}/playlist`;
+  const CACHE_KEY = 'playlist:' + KEY;
+  const POLL_MS = 30000;
+
+  let playlist = null;       // { version, settings, items, reloadToken }
+  let index = -1;
+  let current = null;
+  let pending = null;      // slide that is loading but not on screen yet
+  let timer = null;
+
+  function localDate() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }
+
+  // ---- offline support
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+  try { playlist = JSON.parse(localStorage.getItem(CACHE_KEY)); } catch (e) {}
+
+  async function fetchPlaylist() {
+    try {
+      const r = await fetch(PLAYLIST_URL + '?date=' + localDate(), { cache: 'no-store' });
+      if (!r.ok) throw new Error(r.status);
+      const p = await r.json();
+      if (playlist && playlist.reloadToken !== p.reloadToken && p.reloadToken) {
+        try { localStorage.setItem(CACHE_KEY, JSON.stringify(p)); } catch (e) {}
+        return location.reload();
+      }
+      const changed = !playlist || playlist.version !== p.version || JSON.stringify(playlist.items) !== JSON.stringify(p.items);
+      playlist = p;
+      try { localStorage.setItem(CACHE_KEY, JSON.stringify(p)); } catch (e) {}
+      if (changed) { applySettings(); preload(); if ((!current && !pending) || !playlist.items.length) next(); }
+    } catch (e) {
+      // offline: keep playing whatever we already have
+      if (!playlist) showMessage('Connecting…', 'Waiting for network');
+    }
+  }
+
+  function preload() {
+    // Warm the service-worker cache so ads keep playing if the internet drops
+    if (!('caches' in window)) return;
+    caches.open('ad-media').then(c => playlist.items.filter(it => it.url).forEach(it =>
+      c.match(it.url).then(hit => hit || fetch(it.url).then(r => r.ok && c.put(it.url, r)).catch(() => {}))));
+  }
+
+  function applySettings() {
+    const s = playlist.settings || {};
+    document.body.style.background = s.background || '#000';
+    stage.className = 't-' + (s.transition || 'fade');
+    const rot = Number(s.rotation) || 0;
+    const screen = document.getElementById('screen');
+    screen.style.setProperty('--rot', rot + 'deg');
+    screen.classList.toggle('portrait', rot === 90 || rot === 270);
+  }
+
+  function showMessage(title, sub) {
+    msg.innerHTML = '';
+    msg.append(title);
+    if (sub) { const sm = document.createElement('small'); sm.textContent = sub; msg.append(sm); }
+    msg.hidden = false;
+  }
+
+  function next() {
+    clearTimeout(timer);
+    const items = playlist ? playlist.items : [];
+    if (!items.length) {
+      if (current) { destroySlide(current); current = null; }
+      showMessage('No ads scheduled', 'Add ads from the dashboard — they will appear here automatically.');
+      timer = setTimeout(next, 10000);
+      return;
+    }
+    index = (index + 1) % items.length;
+    const item = items[index];
+    if (item.type === 'youtube' && !navigator.onLine) return skip();
+    show(item);
+  }
+
+  // An ad that can't play right now (e.g. YouTube while offline) is skipped.
+  // If every ad in a row has failed, wait a bit instead of spinning.
+  let skipped = 0;
+  function skip() {
+    clearTimeout(timer);
+    skipped++;
+    if (skipped >= playlist.items.length) {
+      skipped = 0;
+      if (!current) showMessage('Waiting for internet…', 'YouTube ads need an internet connection.');
+      timer = setTimeout(next, 15000);
+    } else {
+      timer = setTimeout(next, 50);
+    }
+  }
+
+  // ---- YouTube
+  let ytReady = null;
+  function loadYouTube() {
+    if (window.YT && YT.Player) return Promise.resolve();
+    if (!ytReady) {
+      ytReady = new Promise((resolve, reject) => {
+        window.onYouTubeIframeAPIReady = resolve;
+        const sc = document.createElement('script');
+        sc.src = 'https://www.youtube.com/iframe_api';
+        sc.onerror = () => { ytReady = null; reject(new Error('YouTube unavailable')); };
+        document.head.append(sc);
+        setTimeout(() => reject(new Error('YouTube timeout')), 15000);
+      });
+      ytReady.catch(() => (ytReady = null));
+    }
+    return ytReady;
+  }
+
+  function destroySlide(el) {
+    if (el._yt) { try { el._yt.destroy(); } catch (e) {} }
+    if (el.tagName === 'VIDEO') { el.pause(); el.removeAttribute('src'); el.load(); }
+    el.remove();
+  }
+
+  function show(item) {
+    const s = playlist.settings || {};
+    const el = document.createElement(item.type === 'video' ? 'video' : item.type === 'youtube' ? 'div' : 'img');
+    pending = el;
+    el.className = 'slide';
+    el.style.objectFit = s.fit || 'contain';
+    let advanced = false;
+    const advance = () => { if (!advanced) { advanced = true; next(); } };
+
+    const reveal = () => {
+      const prev = current;
+      current = el;
+      if (pending === el) pending = null;
+      skipped = 0;
+      msg.hidden = true;
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        el.classList.add('show');
+        if (prev) { prev.classList.remove('show'); prev.classList.add('out'); setTimeout(() => destroySlide(prev), 900); }
+      }));
+    };
+
+    if (item.type === 'youtube') {
+      el.classList.add('yt');
+      const inner = document.createElement('div');
+      el.append(inner);
+      stage.append(el);
+      // if it hasn't started within 20s (blocked, private, slow), move on
+      const fail = () => {
+        if (advanced) return;
+        advanced = true;
+        if (pending === el) pending = null;
+        if (current !== el) destroySlide(el);
+        skip();
+      };
+      timer = setTimeout(fail, 20000);
+      loadYouTube().then(() => {
+        let started = false;
+        const wantSound = s.muteVideos === false;
+        el._yt = new YT.Player(inner, {
+          width: '100%', height: '100%', videoId: item.ytId,
+          playerVars: { autoplay: 1, mute: wantSound ? 0 : 1, controls: 0, rel: 0, modestbranding: 1,
+                        iv_load_policy: 3, playsinline: 1, disablekb: 1, fs: 0, cc_load_policy: 0,
+                        origin: location.origin },
+          events: {
+            onReady: e => {
+              e.target.playVideo();
+              // Chrome may block autoplay with sound: fall back to muted
+              if (wantSound) setTimeout(() => { if (!started) { e.target.mute(); e.target.playVideo(); } }, 3000);
+            },
+            onStateChange: e => {
+              if (e.data === YT.PlayerState.PLAYING && !started) {
+                started = true;
+                clearTimeout(timer);
+                reveal();
+                const len = item.duration > 0 ? item.duration : (e.target.getDuration() || 600) + 10;
+                timer = setTimeout(advance, len * 1000);
+              }
+              if (e.data === YT.PlayerState.ENDED) { clearTimeout(timer); advance(); }
+            },
+            onError: fail,   // removed, private, or embedding not allowed
+          },
+        });
+      }).catch(fail);
+      return;
+    }
+
+    el.onerror = () => { if (advanced) return; advanced = true; if (pending === el) pending = null; el.remove(); skip(); };
+
+    if (item.type === 'video') {
+      el.muted = s.muteVideos !== false;
+      el.playsInline = true;
+      el.preload = 'auto';
+      el.onended = advance;
+      el.oncanplay = () => {
+        el.oncanplay = null;
+        reveal();
+        el.play().catch(() => { el.muted = true; el.play().catch(advance); });
+        // safety net in case "ended" never fires
+        const len = isFinite(el.duration) ? el.duration : item.duration;
+        timer = setTimeout(advance, (Math.max(len, 1) + 5) * 1000);
+      };
+      el.src = item.url;
+      stage.append(el);
+    } else {
+      el.onload = () => { reveal(); timer = setTimeout(advance, (item.duration || 10) * 1000); };
+      el.src = item.url;
+      stage.append(el);
+    }
+  }
+
+  // ---- keep the Chromebook screen awake
+  let wakeLock = null;
+  async function keepAwake() {
+    try { if ('wakeLock' in navigator && document.visibilityState === 'visible') wakeLock = await navigator.wakeLock.request('screen'); } catch (e) {}
+  }
+  document.addEventListener('visibilitychange', keepAwake);
+  keepAwake();
+
+  // ---- full screen (automatic when installed as an app; otherwise one click)
+  const isFull = () => document.fullscreenElement || matchMedia('(display-mode: fullscreen)').matches;
+  function updateTap() { tap.style.display = isFull() ? 'none' : 'block'; }
+  document.addEventListener('click', () => { document.documentElement.requestFullscreen?.().catch(() => {}); keepAwake(); });
+  document.addEventListener('fullscreenchange', updateTap);
+  setTimeout(updateTap, 1500);
+  setTimeout(() => (tap.style.display = 'none'), 20000);
+
+  // ---- daily reload at ~3am keeps long-running screens healthy
+  setInterval(() => { const d = new Date(); if (d.getHours() === 3 && d.getMinutes() === 0) location.reload(); }, 60000);
+
+  if (playlist) { applySettings(); next(); }
+  fetchPlaylist();
+  setInterval(fetchPlaylist, POLL_MS);
+})();
+</script>
+</body>
+</html>

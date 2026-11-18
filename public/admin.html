@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ad Screen Dashboard</title>
+<link rel="icon" href="/icon.svg">
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #fff; --text: #1d2330; --muted: #6b7280; --line: #e3e6eb;
+    --accent: #d97706; --accent-ink: #fff; --danger: #dc2626; --ok: #16a34a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #111318; --card: #1b1e25; --text: #e7e9ee; --muted: #9aa1ad; --line: #2c313b; --accent: #f59e0b; --accent-ink: #111; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background: var(--bg); color: var(--text); }
+  button, input, select { font: inherit; color: inherit; }
+  button { cursor: pointer; border: 1px solid var(--line); background: var(--card); border-radius: 8px; padding: 7px 14px; }
+  button.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+  button.danger { color: var(--danger); }
+  button:disabled { opacity: .5; cursor: default; }
+  input, select { border: 1px solid var(--line); background: var(--card); border-radius: 8px; padding: 7px 10px; width: 100%; }
+  input[type=checkbox] { width: auto; }
+  label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 4px; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+  header { background: var(--card); border-bottom: 1px solid var(--line); }
+  header .wrap { display: flex; align-items: center; gap: 16px; height: 60px; }
+  header h1 { font-size: 17px; margin: 0; flex: 1; display: flex; align-items: center; gap: 10px; }
+  header h1 img { width: 28px; }
+  nav { display: flex; gap: 4px; overflow-x: auto; margin: 18px 0; }
+  nav button { border: 0; background: none; padding: 8px 14px; border-radius: 8px; white-space: nowrap; color: var(--muted); }
+  nav button.on { background: var(--card); color: var(--text); font-weight: 600; box-shadow: 0 1px 2px rgba(0,0,0,.08); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin-bottom: 18px; }
+  .card h2 { margin: 0 0 14px; font-size: 16px; }
+  .muted { color: var(--muted); }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+  .row > * { flex: 1 1 180px; }
+  .banner { background: color-mix(in srgb, var(--accent) 14%, var(--card)); border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); padding: 10px 14px; border-radius: 10px; margin: 18px 0 0; display: flex; justify-content: space-between; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+  #drop { border: 2px dashed var(--line); border-radius: 12px; padding: 28px; text-align: center; color: var(--muted); cursor: pointer; transition: .2s; }
+  #drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+  progress { width: 100%; margin-top: 10px; }
+
+  .ad { display: grid; grid-template-columns: 26px 120px 1fr auto; gap: 14px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+  .ad:first-child { border-top: 0; }
+  .ad.drag { opacity: .4; }
+  .ad.off .thumb { opacity: .35; }
+  .handle { cursor: grab; color: var(--muted); text-align: center; user-select: none; font-size: 18px; }
+  .thumb { width: 120px; aspect-ratio: 16/9; object-fit: cover; border-radius: 6px; background: #000; display: block; }
+  .portrait .thumb { aspect-ratio: 9/16; width: 68px; margin: 0 26px; }
+  .ytthumb { position: relative; display: block; }
+  .ytthumb::after { content: '▶'; position: absolute; inset: 0; margin: auto; width: 30px; height: 21px; border-radius: 6px;
+                    background: #e00; color: #fff; font-size: 11px; display: flex; align-items: center; justify-content: center; }
+  .ad .fields { display: grid; grid-template-columns: 2fr 90px 1fr 1fr; gap: 8px; }
+  .ad .actions { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+  .tag { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  .switch { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+  @media (max-width: 760px) {
+    .ad { grid-template-columns: 20px 90px 1fr; }
+    .thumb { width: 90px; }
+    .ad .fields { grid-template-columns: 1fr 1fr; grid-column: 2 / 4; }
+    .ad .actions { grid-column: 2 / 4; flex-direction: row; flex-wrap: wrap; }
+  }
+  .linkbox { display: flex; gap: 8px; }
+  .linkbox input { font-family: ui-monospace, monospace; font-size: 13px; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; background: var(--muted); }
+  .dot.on { background: var(--ok); }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { text-align: left; padding: 10px 8px; border-top: 1px solid var(--line); vertical-align: middle; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; border-top: 0; }
+  .tablewrap { overflow-x: auto; }
+  ol.steps li { margin-bottom: 8px; }
+  code { background: color-mix(in srgb, var(--muted) 15%, transparent); padding: 1px 6px; border-radius: 4px; font-size: 13px; }
+
+  #login { max-width: 360px; margin: 12vh auto; }
+  #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: #111; color: #fff; padding: 10px 18px; border-radius: 8px; opacity: 0; transition: .3s; pointer-events: none; max-width: calc(100% - 32px); }
+  #toast.show { opacity: 1; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<div id="loginView" hidden>
+  <div id="login" class="wrap">
+    <div class="card">
+      <h2 style="display:flex;gap:10px;align-items:center"><img src="/icon.svg" width="30" alt=""> Ad Screen login</h2>
+      <form id="loginForm">
+        <label>Username</label><input name="username" autocomplete="username" required autofocus>
+        <div style="height:12px"></div>
+        <label>Password</label><input name="password" type="password" autocomplete="current-password" required>
+        <div style="height:16px"></div>
+        <button class="primary" style="width:100%">Log in</button>
+        <p id="loginErr" style="color:var(--danger)"></p>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="appView" hidden>
+  <header><div class="wrap">
+    <h1><img src="/icon.svg" alt=""> <span id="bizName">Ad Screen</span></h1>
+    <span class="muted" id="who"></span>
+    <button id="logout">Log out</button>
+  </div></header>
+
+  <div class="wrap">
+    <div class="banner" id="actingBanner" hidden>
+      <span>Managing ads for <b id="actingName"></b></span>
+      <button id="stopActing">Back to my account</button>
+    </div>
+
+    <nav>
+      <button data-tab="ads" class="on">My ads</button>
+      <button data-tab="screen">Screen</button>
+      <button data-tab="account">Account</button>
+      <button data-tab="customers" data-admin hidden>Customers</button>
+    </nav>
+
+    <!-- ADS -->
+    <section data-pane="ads">
+      <div class="card">
+        <h2>Add ads</h2>
+        <div id="drop">
+          <b>Drop pictures or videos here</b> or click to choose files<br>
+          <small>JPG, PNG, GIF, WebP, MP4, WebM · Best size: <span id="bestSize">1920×1080 (landscape)</span></small>
+        </div>
+        <input type="file" id="fileInput" accept="image/*,video/*" multiple hidden>
+        <progress id="prog" value="0" max="100" hidden></progress>
+        <form id="ytForm" class="row" style="margin-top:16px">
+          <div style="flex:1 1 260px"><label>…or add a YouTube video (paste the link)</label>
+            <input name="url" placeholder="https://www.youtube.com/watch?v=…  or a Shorts link" required></div>
+          <div style="flex:0 0 auto"><button class="primary">Add YouTube video</button></div>
+        </form>
+        <small class="muted">YouTube videos need internet to play, and the video's owner must allow embedding.</small>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+          <h2 style="margin:0">Playlist</h2>
+          <span class="muted" id="summary"></span>
+        </div>
+        <p class="muted" style="margin:6px 0 4px;font-size:13px">Drag ☰ to change the order. Changes show on the screen within 30 seconds.</p>
+        <div id="adList"></div>
+      </div>
+    </section>
+
+    <!-- SCREEN -->
+    <section data-pane="screen" hidden>
+      <div class="card">
+        <h2>Screen status</h2>
+        <p id="status"></p>
+        <label>Screen link (open this on the Chromebook)</label>
+        <div class="linkbox">
+          <input id="screenUrl" readonly>
+          <button id="copyUrl">Copy</button>
+          <button id="openUrl">Preview</button>
+        </div>
+        <div style="height:12px"></div>
+        <button id="refreshScreens">Reload screen now</button>
+      </div>
+
+      <div class="card">
+        <h2>Display settings</h2>
+        <div class="row">
+          <div style="flex-basis:100%"><label>Screen orientation</label>
+            <select id="sRot">
+              <option value="0">Landscape (horizontal) — normal</option>
+              <option value="270">Portrait (vertical) — TV turned clockwise</option>
+              <option value="90">Portrait (vertical) — TV turned counter-clockwise</option>
+              <option value="180">Upside down</option>
+            </select>
+            <small class="muted">Mounting the TV vertically? Pick Portrait. If the picture is upside down, choose the other Portrait option.
+              (If you already rotated the display in the Chromebook's own settings, leave this on Landscape.)</small></div>
+        </div>
+        <div style="height:12px"></div>
+        <div class="row">
+          <div><label>Business name</label><input id="sBiz"></div>
+          <div><label>Transition</label>
+            <select id="sTransition"><option value="fade">Fade</option><option value="slide">Slide</option><option value="none">None</option></select></div>
+          <div><label>Picture fit</label>
+            <select id="sFit"><option value="contain">Show whole picture</option><option value="cover">Fill screen (may crop)</option></select></div>
+        </div>
+        <div style="height:12px"></div>
+        <div class="row">
+          <div><label>Default seconds per picture</label><input id="sDur" type="number" min="1" max="3600"></div>
+          <div><label>Background colour</label><input id="sBg" type="color" style="height:40px;padding:3px"></div>
+          <div><label>&nbsp;</label><label class="switch"><input id="sMute" type="checkbox"> Mute video sound</label></div>
+        </div>
+        <div style="height:16px"></div>
+        <button class="primary" id="saveSettings">Save settings</button>
+      </div>
+
+      <div class="card">
+        <h2>Set up the Chromebook (one time)</h2>
+        <ol class="steps">
+          <li>On the Chromebook, sign in and open the <b>screen link</b> above in Chrome.</li>
+          <li>Install it as an app: click the <b>install icon</b> (⊕ / monitor with arrow) at the right of the address bar, or ⋮ menu → <b>Cast, save, and share → Install page as app</b>. It opens full screen with no browser bars.</li>
+          <li>Make it start automatically: open the <b>Launcher</b>, right-click the <b>Ad Screen</b> app → <b>App info</b> (or Settings → Apps → Ad Screen) and turn on <b>“Open at login” / “Run on OS login”</b>.</li>
+          <li>Keep the screen on: Settings → <b>Device → Power</b> → “When idle”: <b>Keep display on</b>, and turn off “Sleep when cover is closed” if the lid is closed.</li>
+          <li>Optional, so it boots without typing a password: Settings → <b>Security and privacy → Lock screen</b> → turn off “Show lock screen when waking from sleep”. For a fully hands-off kiosk see the README.</li>
+        </ol>
+        <p class="muted" style="font-size:13px">Ads are saved on the Chromebook, so they keep playing if the internet drops.</p>
+      </div>
+    </section>
+
+    <!-- ACCOUNT -->
+    <section data-pane="account" hidden>
+      <div class="card">
+        <h2>Change password</h2>
+        <form id="pwForm" class="row">
+          <div><label>Current password</label><input name="current" type="password" required autocomplete="current-password"></div>
+          <div><label>New password</label><input name="next" type="password" required minlength="6" autocomplete="new-password"></div>
+          <div style="flex:0 0 auto"><button class="primary">Update</button></div>
+        </form>
+      </div>
+    </section>
+
+    <!-- CUSTOMERS (admin) -->
+    <section data-pane="customers" hidden>
+      <div class="card">
+        <h2>Add a customer</h2>
+        <form id="newUser" class="row">
+          <div><label>Business name</label><input name="businessName" required></div>
+          <div><label>Username</label><input name="username" required pattern="[A-Za-z0-9._@\-]{3,40}"></div>
+          <div><label>Password</label><input name="password" required minlength="6"></div>
+          <div style="flex:0 0 auto"><button class="primary">Create</button></div>
+        </form>
+      </div>
+      <div class="card">
+        <h2>Customers</h2>
+        <div class="tablewrap"><table>
+          <thead><tr><th>Business</th><th>Username</th><th>Ads</th><th>Screen</th><th></th></tr></thead>
+          <tbody id="userRows"></tbody>
+        </table></div>
+      </div>
+    </section>
+    <div style="height:40px"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+let me = null;          // logged-in user
+let acting = null;      // admin managing a customer: their id
+let account = null;     // account whose ads are shown
+let ads = [];
+
+const asParam = () => acting ? `?as=${acting}` : '';
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, {
+    ...opts,
+    headers: opts.body && !(opts.body instanceof FormData) ? { 'Content-Type': 'application/json' } : {},
+    body: opts.body && !(opts.body instanceof FormData) ? JSON.stringify(opts.body) : opts.body,
+  });
+  const data = await r.json().catch(() => ({}));
+  if (r.status === 401 && path !== '/api/login') { showLogin(); throw new Error('Please log in'); }
+  if (!r.ok) throw new Error(data.error || 'Something went wrong');
+  return data;
+}
+
+function toast(text) {
+  const t = $('#toast'); t.textContent = text; t.classList.add('show');
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 2500);
+}
+const fail = e => toast(e.message);
+
+function el(tag, attrs = {}, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
+    else if (k in e && typeof v !== 'string') e[k] = v;
+    else e.setAttribute(k, v);
+  }
+  e.append(...kids.filter(k => k != null));
+  return e;
+}
+
+// ---------------- auth
+function showLogin() { $('#appView').hidden = true; $('#loginView').hidden = false; }
+
+$('#loginForm').onsubmit = async e => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  try {
+    me = await api('/api/login', { method: 'POST', body: { username: f.get('username'), password: f.get('password') } });
+    e.target.reset(); $('#loginErr').textContent = '';
+    start();
+  } catch (err) { $('#loginErr').textContent = err.message; }
+};
+
+$('#logout').onclick = async () => { await api('/api/logout', { method: 'POST' }).catch(() => {}); location.reload(); };
+
+async function start() {
+  $('#loginView').hidden = true; $('#appView').hidden = false;
+  $('#who').textContent = me.username;
+  $$('[data-admin]').forEach(x => (x.hidden = me.role !== 'admin'));
+  await loadAds();
+  if (me.role === 'admin') loadUsers();
+}
+
+// ---------------- tabs
+$$('nav button').forEach(b => b.onclick = () => {
+  $$('nav button').forEach(x => x.classList.toggle('on', x === b));
+  $$('[data-pane]').forEach(p => (p.hidden = p.dataset.pane !== b.dataset.tab));
+  if (b.dataset.tab === 'customers') loadUsers();
+  if (b.dataset.tab === 'screen') loadAds();
+});
+
+// ---------------- ads
+async function loadAds() {
+  const d = await api('/api/ads' + asParam());
+  account = d.account; ads = d.ads;
+  $('#bizName').textContent = account.businessName;
+  $('#actingBanner').hidden = !acting;
+  $('#actingName').textContent = account.businessName;
+  applyOrientation();
+  renderAds(); renderScreen();
+}
+
+function applyOrientation() {
+  const r = Number(account.settings.rotation) || 0;
+  const portrait = r === 90 || r === 270;
+  $('#adList').classList.toggle('portrait', portrait);
+  $('#bestSize').textContent = portrait ? '1080×1920 (portrait / vertical)' : '1920×1080 (landscape)';
+}
+
+function fmtSecs(n) { return n >= 60 ? `${Math.floor(n / 60)}m ${n % 60}s` : `${n}s`; }
+
+function renderAds() {
+  const list = $('#adList'); list.innerHTML = '';
+  const active = ads.filter(a => a.enabled);
+  $('#summary').textContent = `${ads.length} ad${ads.length === 1 ? '' : 's'} · ${active.length} playing`;
+  if (!ads.length) { list.append(el('p', { class: 'muted' }, 'No ads yet — add some above.')); return; }
+
+  ads.forEach(ad => {
+    const src = '/media/' + ad.file;
+    const thumb = ad.type === 'youtube'
+      ? el('a', { href: `https://www.youtube.com/watch?v=${ad.ytId}`, target: '_blank', rel: 'noopener', title: 'Open on YouTube', class: 'ytthumb' },
+          el('img', { class: 'thumb', src: `https://i.ytimg.com/vi/${ad.ytId}/hqdefault.jpg`, alt: '', loading: 'lazy' }))
+      : ad.type === 'video'
+      ? el('video', { class: 'thumb', src: src + '#t=1', muted: true, preload: 'metadata' })
+      : el('img', { class: 'thumb', src, alt: '', loading: 'lazy' });
+    const kind = { youtube: 'YouTube', video: 'video', image: 'picture' }[ad.type];
+    const save = patch => api(`/api/ads/${ad.id}${asParam()}`, { method: 'PATCH', body: patch })
+      .then(u => { Object.assign(ad, u); toast('Saved'); renderSummary(); }).catch(fail);
+
+    const row = el('div', { class: 'ad' + (ad.enabled ? '' : ' off') },
+      el('div', { class: 'handle', title: 'Drag to reorder',
+        onmousedown: () => (row.draggable = true), ontouchstart: () => (row.draggable = true) }, '☰'),
+      thumb,
+      el('div', { class: 'fields' },
+        el('div', {}, el('label', {}, 'Name · ' + kind),
+          el('input', { value: ad.name, onchange: e => save({ name: e.target.value }) })),
+        el('div', {}, el('label', {}, ad.type === 'video' ? 'Plays full' : ad.type === 'youtube' ? 'Max seconds' : 'Seconds'),
+          ad.type === 'video'
+            ? el('input', { value: '—', disabled: true, title: 'Videos play to the end' })
+            : ad.type === 'youtube'
+            ? el('input', { type: 'number', min: 0, max: 36000, value: ad.duration || '', placeholder: 'Full',
+                title: 'Leave blank to play the whole video', onchange: e => save({ duration: +e.target.value || 0 }) })
+            : el('input', { type: 'number', min: 1, max: 3600, value: ad.duration, onchange: e => save({ duration: +e.target.value }) })),
+        el('div', {}, el('label', {}, 'Start date (optional)'),
+          el('input', { type: 'date', value: ad.startDate || '', onchange: e => save({ startDate: e.target.value }) })),
+        el('div', {}, el('label', {}, 'End date (optional)'),
+          el('input', { type: 'date', value: ad.endDate || '', onchange: e => save({ endDate: e.target.value }) })),
+      ),
+      el('div', { class: 'actions' },
+        el('label', { class: 'switch' }, el('input', { type: 'checkbox', checked: ad.enabled, onchange: e => {
+          row.classList.toggle('off', !e.target.checked); save({ enabled: e.target.checked });
+        } }), 'Show'),
+        el('button', { class: 'danger', onclick: () => {
+          if (!confirm(`Delete “${ad.name}”?`)) return;
+          api(`/api/ads/${ad.id}${asParam()}`, { method: 'DELETE' }).then(() => { ads = ads.filter(a => a !== ad); renderAds(); toast('Deleted'); }).catch(fail);
+        } }, 'Delete'),
+      ),
+    );
+    row.dataset.id = ad.id;
+    list.append(row);
+  });
+}
+function renderSummary() {
+  $('#summary').textContent = `${ads.length} ad${ads.length === 1 ? '' : 's'} · ${ads.filter(a => a.enabled).length} playing`;
+}
+
+// drag to reorder
+let dragging = null;
+$('#adList').addEventListener('dragstart', e => {
+  dragging = e.target.closest && e.target.closest('.ad');
+  if (!dragging) return;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', dragging.dataset.id);
+  dragging.classList.add('drag');
+});
+document.addEventListener('mouseup', () => $$('#adList .ad').forEach(r => r !== dragging && (r.draggable = false)));
+$('#adList').addEventListener('dragover', e => {
+  if (!dragging) return;
+  e.preventDefault();
+  const over = e.target.closest('.ad');
+  if (!dragging || !over || over === dragging) return;
+  const r = over.getBoundingClientRect();
+  over.parentNode.insertBefore(dragging, e.clientY < r.top + r.height / 2 ? over : over.nextSibling);
+});
+$('#adList').addEventListener('dragend', () => {
+  if (!dragging) return;
+  dragging.classList.remove('drag'); dragging.draggable = false; dragging = null;
+  const ids = $$('#adList .ad').map(r => r.dataset.id);
+  ads.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+  api('/api/ads/reorder' + asParam(), { method: 'POST', body: { ids } }).then(() => toast('Order saved')).catch(fail);
+});
+
+// upload
+const drop = $('#drop'), fileInput = $('#fileInput');
+drop.onclick = () => fileInput.click();
+fileInput.onchange = () => { upload(fileInput.files); fileInput.value = ''; };
+['dragenter', 'dragover'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => upload(e.dataTransfer.files));
+
+$('#ytForm').onsubmit = e => {
+  e.preventDefault();
+  const btn = e.target.querySelector('button'); btn.disabled = true;
+  api('/api/ads/youtube' + asParam(), { method: 'POST', body: { url: e.target.url.value } })
+    .then(ad => { e.target.reset(); toast(`Added “${ad.name}”`); loadAds(); })
+    .catch(fail).finally(() => (btn.disabled = false));
+};
+
+function upload(files) {
+  if (!files.length) return;
+  const fd = new FormData();
+  [...files].forEach(f => fd.append('files', f));
+  const prog = $('#prog'); prog.hidden = false; prog.value = 0;
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/api/ads' + asParam());
+  xhr.upload.onprogress = e => e.lengthComputable && (prog.value = e.loaded / e.total * 100);
+  xhr.onload = () => {
+    prog.hidden = true;
+    let d = {}; try { d = JSON.parse(xhr.responseText); } catch (e) {}
+    if (xhr.status !== 200) return toast(d.error || 'Upload failed');
+    toast(`Added ${d.length} ad${d.length === 1 ? '' : 's'}`); loadAds();
+  };
+  xhr.onerror = () => { prog.hidden = true; toast('Upload failed — check your connection'); };
+  xhr.send(fd);
+}
+
+// ---------------- screen
+function renderScreen() {
+  const url = `${location.origin}/screen/${account.screenKey}`;
+  $('#screenUrl').value = url;
+  const s = account.settings;
+  $('#sBiz').value = account.businessName;
+  $('#sRot').value = String(s.rotation || 0);
+  $('#sTransition').value = s.transition; $('#sFit').value = s.fit;
+  $('#sDur').value = s.defaultDuration; $('#sBg').value = s.background; $('#sMute').checked = s.muteVideos;
+  const seen = account.lastSeen && new Date(account.lastSeen);
+  const online = seen && Date.now() - seen < 2 * 60 * 1000;
+  $('#status').innerHTML = '';
+  $('#status').append(el('span', { class: 'dot' + (online ? ' on' : '') }),
+    online ? 'Screen is online and playing.' : seen ? `Screen last seen ${seen.toLocaleString()}.` : 'Screen has not connected yet.');
+}
+$('#copyUrl').onclick = () => navigator.clipboard.writeText($('#screenUrl').value).then(() => toast('Link copied'));
+$('#openUrl').onclick = () => window.open($('#screenUrl').value, '_blank');
+$('#refreshScreens').onclick = () => api('/api/screen/refresh' + asParam(), { method: 'POST' }).then(() => toast('Screen will reload within 30 seconds')).catch(fail);
+$('#saveSettings').onclick = () => api('/api/settings' + asParam(), { method: 'PATCH', body: {
+  businessName: $('#sBiz').value, transition: $('#sTransition').value, fit: $('#sFit').value,
+  defaultDuration: +$('#sDur').value, background: $('#sBg').value, muteVideos: $('#sMute').checked,
+  rotation: +$('#sRot').value,
+} }).then(u => { account = u; renderScreen(); applyOrientation(); $('#bizName').textContent = u.businessName; toast('Settings saved'); }).catch(fail);
+
+// ---------------- account
+$('#pwForm').onsubmit = e => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  api('/api/password', { method: 'POST', body: { current: f.get('current'), next: f.get('next') } })
+    .then(() => { e.target.reset(); toast('Password changed'); }).catch(fail);
+};
+
+// ---------------- customers (admin)
+async function loadUsers() {
+  if (me.role !== 'admin') return;
+  const users = await api('/api/users');
+  const tb = $('#userRows'); tb.innerHTML = '';
+  users.filter(u => u.role !== 'admin').forEach(u => {
+    const online = u.lastSeen && Date.now() - new Date(u.lastSeen) < 2 * 60 * 1000;
+    tb.append(el('tr', {},
+      el('td', {}, el('b', {}, u.businessName)),
+      el('td', {}, u.username),
+      el('td', {}, String(u.adCount)),
+      el('td', {}, el('span', { class: 'dot' + (online ? ' on' : '') }), online ? 'Online' : 'Offline'),
+      el('td', { style: 'white-space:nowrap;text-align:right' },
+        el('button', { onclick: () => manage(u.id) }, 'Manage ads'), ' ',
+        el('button', { onclick: () => {
+          const pw = prompt(`New password for ${u.username}:`);
+          if (pw) api(`/api/users/${u.id}/password`, { method: 'POST', body: { password: pw } }).then(() => toast('Password reset')).catch(fail);
+        } }, 'Reset password'), ' ',
+        el('button', { class: 'danger', onclick: () => {
+          if (confirm(`Delete ${u.businessName} and all their ads?`))
+            api(`/api/users/${u.id}`, { method: 'DELETE' }).then(() => { toast('Customer deleted'); loadUsers(); }).catch(fail);
+        } }, 'Delete'),
+      ),
+    ));
+  });
+  if (!tb.children.length) tb.append(el('tr', {}, el('td', { colspan: 5, class: 'muted' }, 'No customers yet.')));
+}
+function manage(id) {
+  acting = id;
+  $$('nav button')[0].click();
+  loadAds();
+}
+$('#stopActing').onclick = () => { acting = null; loadAds(); };
+$('#newUser').onsubmit = e => {
+  e.preventDefault();
+  const f = Object.fromEntries(new FormData(e.target));
+  api('/api/users', { method: 'POST', body: f }).then(u => { e.target.reset(); toast(`Created ${u.username}`); loadUsers(); }).catch(fail);
+};
+
+// ---------------- boot
+api('/api/me').then(u => { me = u; start(); }).catch(showLogin);
+</script>
+</body>
+</html>
