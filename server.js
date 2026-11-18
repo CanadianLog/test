@@ -96,7 +96,6 @@ if (!db.users.some(u => u.role === 'admin')) {
 const publicUser = u => ({
   id: u.id, username: u.username, businessName: u.businessName, role: u.role,
   screenKey: u.screenKey, settings: u.settings, lastSeen: u.lastSeen, createdAt: u.createdAt,
-  instagram: u.instagram ? u.instagram.username : null,
   shortCode: u.shortCode,
 });
 
@@ -402,9 +401,6 @@ app.delete('/api/users/:id', auth, adminOnly, (req, res) => {
   save();
   res.json({ ok: true });
 });
-
-// ---------------------------------------------------------------- Instagram
-require('./instagram')(app, { db, save, newId, auth, target, adsFor, bump, MEDIA_DIR, MAX_UPLOAD_MB });
 
 // ---------------------------------------------------------------- player (public, by secret screen key)
 const today = () => new Date().toISOString().slice(0, 10);
